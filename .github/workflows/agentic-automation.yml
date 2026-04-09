@@ -1,0 +1,60 @@
+name: Agentic Automation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+jobs:
+  quality-and-automation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install automation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r automation/requirements.txt
+
+      - name: Run agentic automation pipeline
+        env:
+          CREWAI_API_URL: ${{ secrets.CREWAI_API_URL }}
+          CREWAI_BEARER_TOKEN: ${{ secrets.CREWAI_BEARER_TOKEN }}
+          CREWAI_USER_BEARER_TOKEN: ${{ secrets.CREWAI_USER_BEARER_TOKEN }}
+        run: |
+          python automation/agentic_project_automation.py --skip-ai
+
+      - name: Run remote AI automation (optional)
+        if: ${{ secrets.CREWAI_API_URL != '' && (secrets.CREWAI_BEARER_TOKEN != '' || secrets.CREWAI_USER_BEARER_TOKEN != '') }}
+        env:
+          CREWAI_API_URL: ${{ secrets.CREWAI_API_URL }}
+          CREWAI_BEARER_TOKEN: ${{ secrets.CREWAI_BEARER_TOKEN }}
+          CREWAI_USER_BEARER_TOKEN: ${{ secrets.CREWAI_USER_BEARER_TOKEN }}
+        run: |
+          python automation/agentic_project_automation.py --skip-build --skip-tests --ai-mode remote --wait-remote
+
+      - name: Upload automation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentic-automation-report
+          path: automation/output/agentic_automation_report.json
+          if-no-files-found: warn

@@ -80,3 +80,51 @@ export CREWAI_BEARER_TOKEN="..."
 export CREWAI_USER_BEARER_TOKEN="..."
 python automation/crewai_monthly_decision_automation.py --mode remote --wait --state-file game_state.json
 ```
+
+## Automatizacion integral del proyecto (enfoque agentico)
+
+Se agrego `automation/agentic_project_automation.py` para automatizar todo el ciclo tecnico con un enfoque basado en la guia de agentes de IBM: agentes especializados, uso de herramientas, guardrails y evaluacion continua.
+
+Agentes incluidos en el pipeline:
+
+- PlannerAgent: define el plan de ejecucion por fases.
+- QualityAgent: ejecuta restore, build y test de .NET.
+- SimulationOpsAgent: dispara la automatizacion mensual de decisiones con CrewAI.
+- GovernanceAgent: aplica guardrails de credenciales, evalua resultados y genera recomendaciones.
+
+Salida del pipeline:
+
+- `automation/output/agentic_automation_report.json`: reporte JSON con pasos, comandos, errores y recomendaciones.
+- `automation/output/monthly_actions.json`: acciones mensuales si se ejecuta la fase AI.
+
+### Ejecucion local recomendada
+
+Validacion tecnica completa sin fase AI:
+
+```bash
+python automation/agentic_project_automation.py --skip-ai
+```
+
+Pipeline completo con AI local:
+
+```bash
+python automation/agentic_project_automation.py --ai-mode local
+```
+
+Pipeline con AI remota (requiere tokens):
+
+```bash
+export CREWAI_API_URL="https://..."
+export CREWAI_BEARER_TOKEN="..."
+export CREWAI_USER_BEARER_TOKEN="..."
+python automation/agentic_project_automation.py --ai-mode remote --wait-remote
+```
+
+### Automatizacion en GitHub Actions
+
+Se agrego el workflow `.github/workflows/agentic-automation.yml` que:
+
+- Corre en push/PR a `main`, programado semanalmente y por ejecucion manual.
+- Ejecuta el pipeline de calidad (`--skip-ai`) para garantizar estabilidad.
+- Ejecuta fase remota AI opcional si existen secretos `CREWAI_API_URL` y token.
+- Publica el reporte como artifact.
