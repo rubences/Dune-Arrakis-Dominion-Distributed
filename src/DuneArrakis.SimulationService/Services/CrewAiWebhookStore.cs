@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 
 namespace DuneArrakis.SimulationService.Services;
 
@@ -12,8 +13,26 @@ public interface ICrewAiWebhookStore
 
 public class CrewAiWebhookStore : ICrewAiWebhookStore
 {
+    private readonly string _historyFilePath;
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly ConcurrentDictionary<string, CrewAiExecutionStatus> _statuses = new();
     private readonly ConcurrentDictionary<string, TaskCompletionSource<CrewAiExecutionStatus>> _pending = new();
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true
+    };
+
+    public CrewAiWebhookStore(IConfiguration configuration)
+    {
+        var historyDirectory = configuration["DecisionCrewAi:WebhookHistoryDirectory"]
+            ?? configuration["CrewAi:WebhookHistoryDirectory"]
+            ?? Path.Combine(AppContext.BaseDirectory, "webhook-history");
+
+        Directory.CreateDirectory(historyDirectory);
+        _historyFilePath = Path.Combine(historyDirectory, "crewai-webhook-history.json");
+        LoadHistory();
+    }
 
     public void Store(string source, JsonElement payload)
     {
@@ -32,6 +51,7 @@ public class CrewAiWebhookStore : ICrewAiWebhookStore
         };
 
         _statuses[kickoffId] = status;
+        _ = PersistHistoryAsync();
 
         var tcs = _pending.GetOrAdd(kickoffId, _ => new TaskCompletionSource<CrewAiExecutionStatus>(TaskCreationOptions.RunContinuationsAsynchronously));
         tcs.TrySetResult(status);
@@ -56,6 +76,46 @@ public class CrewAiWebhookStore : ICrewAiWebhookStore
         catch (OperationCanceledException)
         {
             return null;
+        }
+    }
+
+    private void LoadHistory()
+    {
+        if (!File.Exists(_historyFilePath))
+            return;
+
+        try
+        {
+            var json = File.ReadAllText(_historyFilePath);
+            var items = JsonSerializer.Deserialize<List<CrewAiExecutionStatus>>(json, JsonOptions) ?? new List<CrewAiExecutionStatus>();
+            foreach (var item in items.Where(item => !string.IsNullOrWhiteSpace(item.KickoffId)))
+                _statuses[item.KickoffId] = item;
+        }
+        catch
+        {
+            // If history loading fails, keep operating in-memory.
+        }
+    }
+
+    private async Task PersistHistoryAsync()
+    {
+        await _writeLock.WaitAsync();
+        try
+        {
+            var items = _statuses.Values
+                .OrderBy(item => item.KickoffId, StringComparer.Ordinal)
+                .ToList();
+
+            var json = JsonSerializer.Serialize(items, JsonOptions);
+            await File.WriteAllTextAsync(_historyFilePath, json);
+        }
+        catch
+        {
+            // Persistence failures should not break request processing.
+        }
+        finally
+        {
+            _writeLock.Release();
         }
     }
 
