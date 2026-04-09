@@ -35,7 +35,7 @@ public class CrewAiClient : ICrewAiClient
         EnsureConfigured();
 
         var response = await _httpClient.GetFromJsonAsync<CrewAiInputsEnvelope>("/inputs", JsonOptions, cancellationToken);
-        return response?.Inputs ?? Array.Empty<string>();
+        return response?.Inputs ?? new List<string>();
     }
 
     public async Task<CrewAiKickoffResult> KickoffAsync(CrewAiKickoffPayload payload, CancellationToken cancellationToken = default)

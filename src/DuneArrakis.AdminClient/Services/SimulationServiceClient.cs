@@ -211,7 +211,7 @@ public class SimulationServiceClient
 public class SimulationResultDto
 {
     public int Month { get; set; }
-    public List<SimulationEventDto> Events { get; set; } = [];
+    public List<SimulationEventDto> Events { get; set; } = new();
     public decimal CurrentSolaris { get; set; }
 }
 
@@ -227,7 +227,7 @@ public class CrewAiHealthDto
 {
     public bool Configured { get; set; }
     public string Status { get; set; } = string.Empty;
-    public List<string> RequiredInputs { get; set; } = [];
+    public List<string> RequiredInputs { get; set; } = new();
     public string? Error { get; set; }
 }
 
