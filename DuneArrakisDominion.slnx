@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DuneArrakis.AdminClient/DuneArrakis.AdminClient.csproj" />
+    <Project Path="src/DuneArrakis.Domain/DuneArrakis.Domain.csproj" />
+    <Project Path="src/DuneArrakis.PersistenceService/DuneArrakis.PersistenceService.csproj" />
+    <Project Path="src/DuneArrakis.SimulationService/DuneArrakis.SimulationService.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DuneArrakis.Tests/DuneArrakis.Tests.csproj" />
+  </Folder>
+</Solution>
