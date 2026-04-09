@@ -206,6 +206,46 @@ public class SimulationServiceClient
             throw new InvalidOperationException("Error de conexión con la integración de CrewAI.");
         }
     }
+
+    public async Task<MonthlyAutomationResultDto?> ExecuteMonthlyAutomationAsync(
+        GameState gameState,
+        bool waitForCompletion = true,
+        bool executeActions = true,
+        bool processMonthAfterActions = false,
+        int maxPollAttempts = 10,
+        int pollIntervalSeconds = 3)
+    {
+        try
+        {
+            var request = new
+            {
+                gameState,
+                waitForCompletion,
+                executeActions,
+                processMonthAfterActions,
+                maxPollAttempts,
+                pollIntervalSeconds
+            };
+
+            var response = await _httpClient.PostAsJsonAsync("api/simulation/ai/monthly-automation", request, JsonOptions);
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new InvalidOperationException(error.Trim('"'));
+            }
+
+            return await response.Content.ReadFromJsonAsync<MonthlyAutomationResultDto>(JsonOptions);
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error ejecutando la automatización mensual en CrewAI.");
+            throw new InvalidOperationException("Error de conexión con la automatización mensual de CrewAI.");
+        }
+    }
 }
 
 public class SimulationResultDto
@@ -241,4 +281,28 @@ public class CrewAiStrategicAdviceDto
 
     [JsonPropertyName("rawResponse")]
     public string? RawResponse { get; set; }
+}
+
+public class MonthlyAutomationActionsDto
+{
+    public int ComprarSuministros { get; set; }
+    public List<string> TrasladarCriaturas { get; set; } = new();
+    public List<string> RegistrarLetargo { get; set; } = new();
+    public string? RawOutput { get; set; }
+}
+
+public class MonthlyAutomationResultDto
+{
+    public bool Configured { get; set; }
+    public string KickoffId { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string? Error { get; set; }
+    public bool ActionsApplied { get; set; }
+    public int PurchasedSupplyUnits { get; set; }
+    public int AllocatedFoodUnits { get; set; }
+    public List<Guid> ExecutedTransfers { get; set; } = new();
+    public List<Guid> RegisteredLethargy { get; set; } = new();
+    public MonthlyAutomationActionsDto? Actions { get; set; }
+    public SimulationResultDto? SimulationResult { get; set; }
+    public GameState? GameState { get; set; }
 }

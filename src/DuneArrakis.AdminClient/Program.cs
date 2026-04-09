@@ -55,6 +55,7 @@ async Task RunMainMenuAsync()
         Console.WriteLine("  [6] Avanzar mes (simulación)");
         Console.WriteLine("  [7] Ver registro de eventos");
         Console.WriteLine("  [8] Consultar asesor estratégico CrewAI");
+        Console.WriteLine("  [9] Ejecutar automatización mensual CrewAI");
         Console.WriteLine("  [0] Salir");
         PrintSeparator();
         Console.Write("  Selección: ");
@@ -70,6 +71,7 @@ async Task RunMainMenuAsync()
             case "6": await AdvanceMonthAsync(); break;
             case "7": ShowEventLog(); break;
             case "8": await ConsultCrewAiAdvisorAsync(); break;
+            case "9": await ExecuteMonthlyAutomationAsync(); break;
             case "0":
                 PrintInfo("¡Hasta pronto, Administrator!");
                 return;
@@ -198,6 +200,7 @@ void ShowCommandCenter()
     // Funds
     Console.ForegroundColor = ConsoleColor.Yellow;
     Console.WriteLine($"  💰 Fondos: {s.CurrentSolaris:N0} Solaris");
+    Console.WriteLine($"  🍖 Suministros almacenados: {s.StoredFoodUnits:N0} unidades");
     Console.ResetColor();
 
     // Enclaves summary
@@ -636,6 +639,73 @@ async Task ConsultCrewAiAdvisorAsync()
         {
             PrintInfo("La ejecución sigue en curso. Consulte el estado con el kickoff devuelto desde el endpoint de simulación.");
         }
+    }
+    catch (InvalidOperationException ex)
+    {
+        PrintError(ex.Message);
+    }
+}
+
+async Task ExecuteMonthlyAutomationAsync()
+{
+    if (currentGame is null) { PrintError("No hay partida activa."); return; }
+
+    var available = await simulationClient.IsAvailableAsync();
+    if (!available)
+    {
+        PrintError("Servicio de simulación no disponible. Inicie DuneArrakis.SimulationService.");
+        return;
+    }
+
+    PrintHeader("AUTOMATIZACIÓN MENSUAL CREWAI");
+    Console.Write("  ¿Procesar también el mes tras aplicar acciones? [s/N]: ");
+    var processMonth = string.Equals(Console.ReadLine()?.Trim(), "s", StringComparison.OrdinalIgnoreCase);
+
+    try
+    {
+        var result = await simulationClient.ExecuteMonthlyAutomationAsync(
+            currentGame,
+            waitForCompletion: true,
+            executeActions: true,
+            processMonthAfterActions: processMonth);
+
+        if (result is null)
+        {
+            PrintError("No se recibió respuesta de la automatización mensual.");
+            return;
+        }
+
+        if (result.GameState is not null)
+            currentGame = result.GameState;
+
+        PrintSuccess($"Kickoff mensual enviado: {result.KickoffId}");
+        PrintInfo($"Estado del crew: {result.Status}");
+
+        if (result.Actions is not null)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"  Comprar suministros: {result.Actions.ComprarSuministros}");
+            Console.WriteLine($"  Traslados propuestos: {result.Actions.TrasladarCriaturas.Count}");
+            Console.WriteLine($"  Registros de letargo: {result.Actions.RegistrarLetargo.Count}");
+        }
+
+        if (result.ActionsApplied)
+        {
+            Console.WriteLine();
+            PrintSuccess($"Suministros comprados: {result.PurchasedSupplyUnits}");
+            PrintSuccess($"Alimento distribuido: {result.AllocatedFoodUnits}");
+            PrintSuccess($"Traslados ejecutados: {result.ExecutedTransfers.Count}");
+        }
+
+        if (result.SimulationResult is not null)
+        {
+            Console.WriteLine();
+            PrintInfo($"Mes procesado automáticamente: {result.SimulationResult.Month}");
+            Console.WriteLine($"  Solaris actuales: {result.SimulationResult.CurrentSolaris:N0}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.Error))
+            PrintError(result.Error);
     }
     catch (InvalidOperationException ex)
     {

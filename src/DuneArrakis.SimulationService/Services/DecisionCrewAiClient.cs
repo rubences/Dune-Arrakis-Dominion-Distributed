@@ -1,11 +1,10 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 
 namespace DuneArrakis.SimulationService.Services;
 
-public interface ICrewAiClient
+public interface IDecisionCrewAiClient
 {
     bool IsConfigured { get; }
     Task<IReadOnlyList<string>> GetRequiredInputsAsync(CancellationToken cancellationToken = default);
@@ -13,15 +12,15 @@ public interface ICrewAiClient
     Task<CrewAiExecutionStatus> GetStatusAsync(string kickoffId, CancellationToken cancellationToken = default);
 }
 
-public class CrewAiClient : ICrewAiClient
+public class DecisionCrewAiClient : IDecisionCrewAiClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _httpClient;
-    private readonly CrewAiOptions _options;
-    private readonly ILogger<CrewAiClient> _logger;
+    private readonly DecisionCrewAiOptions _options;
+    private readonly ILogger<DecisionCrewAiClient> _logger;
 
-    public CrewAiClient(HttpClient httpClient, IOptions<CrewAiOptions> options, ILogger<CrewAiClient> logger)
+    public DecisionCrewAiClient(HttpClient httpClient, IOptions<DecisionCrewAiOptions> options, ILogger<DecisionCrewAiClient> logger)
     {
         _httpClient = httpClient;
         _options = options.Value;
@@ -46,7 +45,7 @@ public class CrewAiClient : ICrewAiClient
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<CrewAiKickoffResult>(JsonOptions, cancellationToken);
-        return result ?? throw new InvalidOperationException("CrewAI no devolvió un kickoff_id válido.");
+        return result ?? throw new InvalidOperationException("El crew de decisiones no devolvió un kickoff_id válido.");
     }
 
     public async Task<CrewAiExecutionStatus> GetStatusAsync(string kickoffId, CancellationToken cancellationToken = default)
@@ -78,19 +77,19 @@ public class CrewAiClient : ICrewAiClient
         throw new InvalidOperationException($"No se encontró un endpoint de estado válido para el kickoff '{kickoffId}'.");
     }
 
-    private static IEnumerable<string> GetStatusPaths(string kickoffId)
-    {
-        yield return $"/{Uri.EscapeDataString(kickoffId)}/status";
-        yield return $"/status/{Uri.EscapeDataString(kickoffId)}";
-    }
-
     private void EnsureConfigured()
     {
         if (!IsConfigured)
         {
-            _logger.LogWarning("Se intentó usar CrewAI sin configurar BaseUrl o BearerToken.");
-            throw new InvalidOperationException("La integración con CrewAI no está configurada.");
+            _logger.LogWarning("Se intentó usar el crew de decisiones sin configurar BaseUrl o BearerToken.");
+            throw new InvalidOperationException("La integración con el crew de decisiones no está configurada.");
         }
+    }
+
+    private static IEnumerable<string> GetStatusPaths(string kickoffId)
+    {
+        yield return $"/{Uri.EscapeDataString(kickoffId)}/status";
+        yield return $"/status/{Uri.EscapeDataString(kickoffId)}";
     }
 
     private static string? FindFirstAvailableString(JsonElement element, params string[] propertyNames)
@@ -142,40 +141,4 @@ public class CrewAiClient : ICrewAiClient
 
         return null;
     }
-}
-
-public class CrewAiInputsEnvelope
-{
-    public List<string> Inputs { get; set; } = new();
-}
-
-public class CrewAiKickoffPayload
-{
-    public Dictionary<string, string> Inputs { get; set; } = new();
-    public Dictionary<string, object?>? Meta { get; set; }
-    public string? TaskWebhookUrl { get; set; }
-    public string? StepWebhookUrl { get; set; }
-    public string? CrewWebhookUrl { get; set; }
-}
-
-public class CrewAiKickoffResult
-{
-    [JsonPropertyName("kickoff_id")]
-    public string KickoffId { get; set; } = string.Empty;
-}
-
-public class CrewAiExecutionStatus
-{
-    public string KickoffId { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
-    public string? ResultText { get; set; }
-    public string? Error { get; set; }
-    public string RawJson { get; set; } = string.Empty;
-
-    public bool IsTerminal =>
-        string.Equals(Status, "completed", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(Status, "success", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(Status, "failed", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(Status, "error", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(Status, "cancelled", StringComparison.OrdinalIgnoreCase);
 }

@@ -12,17 +12,20 @@ public class SimulationController : ControllerBase
     private readonly ISimulationEngine _simulationEngine;
     private readonly ICrewAiAdvisor _crewAiAdvisor;
     private readonly ICrewAiClient _crewAiClient;
+    private readonly IMonthlyDecisionAutomationService _monthlyDecisionAutomationService;
     private readonly ILogger<SimulationController> _logger;
 
     public SimulationController(
         ISimulationEngine simulationEngine,
         ICrewAiAdvisor crewAiAdvisor,
         ICrewAiClient crewAiClient,
+        IMonthlyDecisionAutomationService monthlyDecisionAutomationService,
         ILogger<SimulationController> logger)
     {
         _simulationEngine = simulationEngine;
         _crewAiAdvisor = crewAiAdvisor;
         _crewAiClient = crewAiClient;
+        _monthlyDecisionAutomationService = monthlyDecisionAutomationService;
         _logger = logger;
     }
 
@@ -315,6 +318,37 @@ public class SimulationController : ControllerBase
             return StatusCode(502, "No se pudo completar la consulta al crew.");
         }
     }
+
+    [HttpPost("ai/monthly-automation")]
+    public async Task<ActionResult<MonthlyAutomationResult>> ExecuteMonthlyAutomation(
+        [FromBody] MonthlyAutomationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null || request.GameState is null)
+            return BadRequest("Debe proporcionar un estado del juego válido.");
+
+        try
+        {
+            var result = await _monthlyDecisionAutomationService.GenerateAndApplyActionsAsync(
+                request.GameState,
+                request.WaitForCompletion,
+                request.ExecuteActions,
+                request.ProcessMonthAfterActions,
+                request.MaxPollAttempts,
+                request.PollIntervalSeconds,
+                cancellationToken);
+
+            if (!result.Configured)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error ejecutando la automatización mensual impulsada por CrewAI.");
+            return StatusCode(502, "No se pudo completar la automatización mensual del crew.");
+        }
+    }
 }
 
 public record BuyCreatureRequest(GameState GameState, Guid EnclaveId, CreatureType CreatureType);
@@ -326,6 +360,13 @@ public record CrewAiStrategicAdviceRequest(
     GameState GameState,
     string Prompt,
     bool WaitForCompletion = true,
+    int MaxPollAttempts = 10,
+    int PollIntervalSeconds = 3);
+public record MonthlyAutomationRequest(
+    GameState GameState,
+    bool WaitForCompletion = true,
+    bool ExecuteActions = true,
+    bool ProcessMonthAfterActions = false,
     int MaxPollAttempts = 10,
     int PollIntervalSeconds = 3);
 public record CrewAiHealthResponse(bool Configured, string Status, IReadOnlyList<string> RequiredInputs, string? Error);
