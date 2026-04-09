@@ -4,28 +4,65 @@ using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+// ──────────────────────────────────────────────────────────────────────────────
+// CORS — permite conexiones desde Unity (localhost cualquier puerto) y Swagger UI
+// ──────────────────────────────────────────────────────────────────────────────
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("UnityClient", policy =>
+        policy
+            .SetIsOriginAllowed(_ => true)   // Unity no tiene origen HTTP fijo
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials());
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Controllers + Swagger
+// ──────────────────────────────────────────────────────────────────────────────
+builder.Services.AddControllers()
+    .AddJsonOptions(opts =>
+    {
+        // Serialización camelCase para que Unity JsonUtility lo deserialice bien
+        opts.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        opts.JsonSerializerOptions.DefaultIgnoreCondition =
+            System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+    });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new() { Title = "Dune Simulation Service", Version = "v1" });
+    c.SwaggerDoc("v1", new()
+    {
+        Title   = "🏜 Dune Arrakis Dominion — Simulation Service",
+        Version = "v2026.1",
+        Description = "Backend de Orquestación Multi-Agente para el demostrador Dune Arrakis Dominion"
+    });
 });
 
-// Orquestación Multi-Agente con MediatR
-builder.Services.AddMediatR(cfg => 
+// ──────────────────────────────────────────────────────────────────────────────
+// MediatR — Publicación PARALELA de eventos entre agentes
+// ──────────────────────────────────────────────────────────────────────────────
+builder.Services.AddMediatR(cfg =>
 {
     cfg.RegisterServicesFromAssemblyContaining<Program>();
-    // Configuramos publicador paralelo para que ambos agentes (Logistics y Strategic) se ejecuten en paralelo simultáneamente
-    cfg.NotificationPublisher = new MediatR.NotificationPublishers.TaskWhenAllPublisher();
+    // TaskWhenAllPublisher → todos los INotificationHandler se disparan en paralelo
+    cfg.NotificationPublisher     = new MediatR.NotificationPublishers.TaskWhenAllPublisher();
     cfg.NotificationPublisherType = typeof(MediatR.NotificationPublishers.TaskWhenAllPublisher);
 });
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Options
+// ──────────────────────────────────────────────────────────────────────────────
 builder.Services.AddOptions<CrewAiOptions>()
     .Bind(builder.Configuration.GetSection(CrewAiOptions.SectionName));
 
 builder.Services.AddOptions<DecisionCrewAiOptions>()
     .Bind(builder.Configuration.GetSection(DecisionCrewAiOptions.SectionName));
 
+// ──────────────────────────────────────────────────────────────────────────────
+// HTTP Clients para CrewAI (helper local)
+// ──────────────────────────────────────────────────────────────────────────────
 static void ConfigureCrewAiHttpClient(HttpClient client, string baseUrl, int timeout, string token)
 {
     if (Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri))
@@ -37,33 +74,48 @@ static void ConfigureCrewAiHttpClient(HttpClient client, string baseUrl, int tim
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 }
 
-builder.Services.AddHttpClient<ICrewAiClient, CrewAiClient>((serviceProvider, client) =>
+builder.Services.AddHttpClient<ICrewAiClient, CrewAiClient>((sp, client) =>
 {
-    var options = serviceProvider.GetRequiredService<IOptions<CrewAiOptions>>().Value;
-    ConfigureCrewAiHttpClient(client, options.BaseUrl, options.RequestTimeoutSeconds, options.BearerToken);
+    var opts = sp.GetRequiredService<IOptions<CrewAiOptions>>().Value;
+    ConfigureCrewAiHttpClient(client, opts.BaseUrl, opts.RequestTimeoutSeconds, opts.BearerToken);
 });
 
-builder.Services.AddSingleton<ISimulationEngine, SimulationEngine>();
+builder.Services.AddHttpClient<IDecisionCrewAiClient, DecisionCrewAiClient>((sp, client) =>
+{
+    var opts = sp.GetRequiredService<IOptions<DecisionCrewAiOptions>>().Value;
+    ConfigureCrewAiHttpClient(client, opts.BaseUrl, opts.RequestTimeoutSeconds, opts.BearerToken);
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Servicios de Dominio
+// IMPORTANTE: SimulationEngine usa IPublisher (scoped en MediatR), por eso
+// lo registramos como Scoped (no Singleton) para evitar captive-dependency.
+// ──────────────────────────────────────────────────────────────────────────────
+builder.Services.AddScoped<ISimulationEngine, SimulationEngine>();
 builder.Services.AddSingleton<ICrewAiAdvisor, CrewAiAdvisor>();
 builder.Services.AddSingleton<ICrewAiWebhookStore, CrewAiWebhookStore>();
-
-builder.Services.AddHttpClient<IDecisionCrewAiClient, DecisionCrewAiClient>((serviceProvider, client) =>
-{
-    var options = serviceProvider.GetRequiredService<IOptions<DecisionCrewAiOptions>>().Value;
-    ConfigureCrewAiHttpClient(client, options.BaseUrl, options.RequestTimeoutSeconds, options.BearerToken);
-});
-
 builder.Services.AddSingleton<IMonthlyDecisionAutomationService, MonthlyDecisionAutomationService>();
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Build & Middleware Pipeline
+// ──────────────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// Always expose Swagger (útil para demos)
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Dune Simulation Service v2026.1");
+    c.RoutePrefix = "swagger";
+    c.DocumentTitle = "Dune Arrakis — API Docs";
+});
 
-app.UseHttpsRedirection();
+app.UseCors("UnityClient");
+
+// Solo HTTPS en producción
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
+
 app.UseAuthorization();
 app.MapControllers();
 

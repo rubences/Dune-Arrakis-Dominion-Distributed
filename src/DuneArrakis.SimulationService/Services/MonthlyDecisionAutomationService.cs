@@ -29,20 +29,20 @@ public class MonthlyDecisionAutomationService : IMonthlyDecisionAutomationServic
     private readonly IDecisionCrewAiClient _decisionCrewAiClient;
     private readonly ICrewAiWebhookStore _webhookStore;
     private readonly DecisionCrewAiOptions _options;
-    private readonly ISimulationEngine _simulationEngine;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MonthlyDecisionAutomationService> _logger;
 
     public MonthlyDecisionAutomationService(
         IDecisionCrewAiClient decisionCrewAiClient,
         ICrewAiWebhookStore webhookStore,
         IOptions<DecisionCrewAiOptions> options,
-        ISimulationEngine simulationEngine,
+        IServiceScopeFactory scopeFactory,
         ILogger<MonthlyDecisionAutomationService> logger)
     {
         _decisionCrewAiClient = decisionCrewAiClient;
         _webhookStore = webhookStore;
         _options = options.Value;
-        _simulationEngine = simulationEngine;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -109,7 +109,12 @@ public class MonthlyDecisionAutomationService : IMonthlyDecisionAutomationServic
             ApplyActions(gameState, result);
 
         if (processMonthAfterActions)
-            result.SimulationResult = _simulationEngine.ProcessMonth(gameState);
+        {
+            // Crear un scope para resolver el ISimulationEngine (Scoped) desde un Singleton
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var engine = scope.ServiceProvider.GetRequiredService<ISimulationEngine>();
+            result.SimulationResult = await engine.ProcessMonthAsync(gameState, cancellationToken);
+        }
 
         result.GeneratedEvents = gameState.ActiveScenario.EventLog.Skip(initialEventCount).ToList();
 

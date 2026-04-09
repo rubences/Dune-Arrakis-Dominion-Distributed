@@ -8,6 +8,7 @@ namespace DuneArrakis.SimulationService.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Produces("application/json")]
 public class SimulationController : ControllerBase
 {
     private readonly ISimulationEngine _simulationEngine;
@@ -33,107 +34,154 @@ public class SimulationController : ControllerBase
         _logger = logger;
     }
 
-    [HttpPost("process-month")]
-    public async Task<ActionResult<SimulationResult>> ProcessMonth([FromBody] GameState gameState)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // GAME STATE MANAGEMENT
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Crea una nueva partida con un Escenario inicial y dos Enclaves.</summary>
+    [HttpPost("new-game")]
+    public ActionResult<GameState> NewGame([FromQuery] int scenarioType = 0, [FromQuery] string saveName = "Partida")
     {
-        if (gameState is null || gameState.ActiveScenario is null)
+        var scenario = scenarioType switch
+        {
+            1 => Scenario.CreateGiediPrime(),
+            2 => Scenario.CreateCaladan(),
+            _ => Scenario.CreateArrakeen()
+        };
+
+        // Añadir enclave de aclimatación y exhibición por defecto
+        scenario.Enclaves.Add(Enclave.CreateAclimatacion("Zona de Aclimatación I"));
+        scenario.Enclaves.Add(Enclave.CreateExhibicion("Gran Exhibición de Arrakis"));
+
+        var state = GameState.NewGame(scenario, saveName);
+        _logger.LogInformation("Nueva partida creada: {SaveName} — Escenario: {Scenario}", saveName, scenario.Name);
+        return Ok(state);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PLAYER ACTIONS (Stateless — Backend valida y devuelve el estado mutado)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Procesa el turno mensual y dispara los Agentes IA en paralelo.</summary>
+    [HttpPost("process-month")]
+    public async Task<ActionResult<SimulationResult>> ProcessMonth(
+        [FromBody] GameState gameState,
+        CancellationToken cancellationToken)
+    {
+        if (gameState?.ActiveScenario is null)
             return BadRequest("El estado del juego no puede ser nulo.");
 
         try
         {
-            var result = await _simulationEngine.ProcessMonthAsync(gameState);
+            var result = await _simulationEngine.ProcessMonthAsync(gameState, cancellationToken);
             return Ok(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error procesando el mes de simulación");
-            return StatusCode(500, "Error al procesar el mes de simulación.");
+            return StatusCode(500, new { error = "Error al procesar el mes de simulación.", detail = ex.Message });
         }
     }
 
-    [HttpPost("buy-creature")]
-    public ActionResult<GameState> BuyCreature([FromBody] BuyCreatureRequest request)
+    /// <summary>Compra una criatura y la añade al enclave especificado.</summary>
+    [HttpPost("purchase-creature")]
+    public ActionResult<GameState> PurchaseCreature([FromBody] PurchaseCreatureRequest request)
     {
-        if (request is null || request.GameState is null)
+        if (request?.GameState?.ActiveScenario is null)
             return BadRequest("La solicitud no puede ser nula.");
 
         try
         {
-            var scenario = request.GameState.ActiveScenario;
-            scenario.PurchaseCreature(request.EnclaveId, request.CreatureType);
+            request.GameState.ActiveScenario.PurchaseCreature(request.EnclaveId, request.CreatureType);
             return Ok(request.GameState);
         }
         catch (DuneArrakis.Domain.Exceptions.DomainException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequest(new { error = ex.Message });
         }
     }
 
+    /// <summary>Alias legacy para compatibilidad.</summary>
+    [HttpPost("buy-creature")]
+    public ActionResult<GameState> BuyCreature([FromBody] PurchaseCreatureRequest request)
+        => PurchaseCreature(request);
+
+    /// <summary>Transfiere una criatura entre enclaves.</summary>
     [HttpPost("transfer-creature")]
     public ActionResult<GameState> TransferCreature([FromBody] TransferCreatureRequest request)
     {
-        if (request is null || request.GameState is null)
+        if (request?.GameState?.ActiveScenario is null)
             return BadRequest("La solicitud no puede ser nula.");
 
         try
         {
-            var scenario = request.GameState.ActiveScenario;
-            scenario.TransferCreature(request.SourceEnclaveId, request.TargetEnclaveId, request.CreatureId);
+            request.GameState.ActiveScenario.TransferCreature(
+                request.SourceEnclaveId, request.TargetEnclaveId, request.CreatureId);
             return Ok(request.GameState);
         }
         catch (DuneArrakis.Domain.Exceptions.DomainException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequest(new { error = ex.Message });
         }
     }
 
+    /// <summary>Construye una instalación en el enclave especificado.</summary>
     [HttpPost("build-facility")]
     public ActionResult<GameState> BuildFacility([FromBody] BuildFacilityRequest request)
     {
-        if (request is null || request.GameState is null)
+        if (request?.GameState?.ActiveScenario is null)
             return BadRequest("La solicitud no puede ser nula.");
 
         try
         {
-            var scenario = request.GameState.ActiveScenario;
-            scenario.BuildFacility(request.EnclaveId, request.FacilityType);
+            request.GameState.ActiveScenario.BuildFacility(request.EnclaveId, request.FacilityType);
             return Ok(request.GameState);
         }
         catch (DuneArrakis.Domain.Exceptions.DomainException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequest(new { error = ex.Message });
         }
     }
 
+    /// <summary>Alimenta una criatura con la cantidad especificada de unidades de comida.</summary>
     [HttpPost("feed-creature")]
     public ActionResult<GameState> FeedCreature([FromBody] FeedCreatureRequest request)
     {
-        if (request is null || request.GameState is null)
+        if (request?.GameState?.ActiveScenario is null)
             return BadRequest("La solicitud no puede ser nula.");
 
         try
         {
-            var scenario = request.GameState.ActiveScenario;
-            scenario.FeedCreature(request.CreatureId, request.FoodAmount);
+            request.GameState.ActiveScenario.FeedCreature(request.CreatureId, request.FoodAmount);
             return Ok(request.GameState);
         }
         catch (DuneArrakis.Domain.Exceptions.DomainException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequest(new { error = ex.Message });
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // HEALTH & DIAGNOSTICS
+    // ═══════════════════════════════════════════════════════════════════════════
+
     [HttpGet("health")]
-    public IActionResult HealthCheck() => Ok(new { status = "healthy", service = "SimulationService" });
+    public IActionResult HealthCheck() => Ok(new
+    {
+        status          = "healthy",
+        service         = "DuneArrakis.SimulationService",
+        version         = "2026.1",
+        agentsEnabled   = true,
+        parallelMode    = "TaskWhenAllPublisher",
+        timestamp       = DateTime.UtcNow
+    });
 
     [HttpGet("ai/health")]
     public async Task<IActionResult> GetCrewAiHealth(CancellationToken cancellationToken)
     {
         if (!_crewAiClient.IsConfigured)
-        {
             return Ok(new CrewAiHealthResponse(false, "not-configured", Array.Empty<string>(),
                 "Configure CrewAi:BaseUrl y CrewAi:BearerToken para habilitar la integración."));
-        }
 
         try
         {
@@ -147,16 +195,18 @@ public class SimulationController : ControllerBase
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // AI AGENT ENDPOINTS (Direct invocation, outside the MediatR event flow)
+    // ═══════════════════════════════════════════════════════════════════════════
+
     [HttpGet("ai/inputs")]
     public async Task<ActionResult<IReadOnlyList<string>>> GetCrewAiInputs(CancellationToken cancellationToken)
     {
         if (!_crewAiClient.IsConfigured)
             return BadRequest("La integración con CrewAI no está configurada.");
-
         try
         {
-            var inputs = await _crewAiClient.GetRequiredInputsAsync(cancellationToken);
-            return Ok(inputs);
+            return Ok(await _crewAiClient.GetRequiredInputsAsync(cancellationToken));
         }
         catch (Exception ex)
         {
@@ -172,18 +222,12 @@ public class SimulationController : ControllerBase
     {
         if (!_crewAiClient.IsConfigured)
             return BadRequest("La integración con CrewAI no está configurada.");
-
-        if (request is null || request.Inputs.Count == 0)
+        if (request?.Inputs.Count == 0)
             return BadRequest("Debe proporcionar al menos un input para el crew.");
-
         try
         {
-            var result = await _crewAiClient.KickoffAsync(new CrewAiKickoffPayload
-            {
-                Inputs = request.Inputs,
-                Meta = request.Meta
-            }, cancellationToken);
-
+            var result = await _crewAiClient.KickoffAsync(
+                new CrewAiKickoffPayload { Inputs = request.Inputs, Meta = request.Meta }, cancellationToken);
             return Ok(result);
         }
         catch (Exception ex)
@@ -195,16 +239,13 @@ public class SimulationController : ControllerBase
 
     [HttpGet("ai/status/{kickoffId}")]
     public async Task<ActionResult<CrewAiExecutionStatus>> GetCrewAiStatus(
-        string kickoffId,
-        CancellationToken cancellationToken)
+        string kickoffId, CancellationToken cancellationToken)
     {
         if (!_crewAiClient.IsConfigured)
             return BadRequest("La integración con CrewAI no está configurada.");
-
         try
         {
-            var status = await _crewAiClient.GetStatusAsync(kickoffId, cancellationToken);
-            return Ok(status);
+            return Ok(await _crewAiClient.GetStatusAsync(kickoffId, cancellationToken));
         }
         catch (Exception ex)
         {
@@ -218,26 +259,18 @@ public class SimulationController : ControllerBase
         [FromBody] CrewAiStrategicAdviceRequest request,
         CancellationToken cancellationToken)
     {
-        if (request is null || request.GameState is null)
+        if (request?.GameState is null)
             return BadRequest("Debe proporcionar un estado del juego válido.");
-
         if (string.IsNullOrWhiteSpace(request.Prompt))
             return BadRequest("Debe proporcionar una instrucción para el crew.");
-
         try
         {
             var result = await _crewAiAdvisor.GetStrategicAdviceAsync(
-                request.GameState,
-                request.Prompt,
-                request.WaitForCompletion,
-                request.MaxPollAttempts,
-                request.PollIntervalSeconds,
-                cancellationToken);
+                request.GameState, request.Prompt,
+                request.WaitForCompletion, request.MaxPollAttempts,
+                request.PollIntervalSeconds, cancellationToken);
 
-            if (!result.Configured)
-                return BadRequest(result);
-
-            return Ok(result);
+            return result.Configured ? Ok(result) : BadRequest(result);
         }
         catch (Exception ex)
         {
@@ -251,24 +284,16 @@ public class SimulationController : ControllerBase
         [FromBody] MonthlyAutomationRequest request,
         CancellationToken cancellationToken)
     {
-        if (request is null || request.GameState is null)
+        if (request?.GameState is null)
             return BadRequest("Debe proporcionar un estado del juego válido.");
-
         try
         {
             var result = await _monthlyDecisionAutomationService.GenerateAndApplyActionsAsync(
-                request.GameState,
-                request.WaitForCompletion,
-                request.ExecuteActions,
-                request.ProcessMonthAfterActions,
-                request.MaxPollAttempts,
-                request.PollIntervalSeconds,
-                cancellationToken);
+                request.GameState, request.WaitForCompletion, request.ExecuteActions,
+                request.ProcessMonthAfterActions, request.MaxPollAttempts,
+                request.PollIntervalSeconds, cancellationToken);
 
-            if (!result.Configured)
-                return BadRequest(result);
-
-            return Ok(result);
+            return result.Configured ? Ok(result) : BadRequest(result);
         }
         catch (Exception ex)
         {
@@ -286,7 +311,8 @@ public class SimulationController : ControllerBase
     }
 }
 
-public record BuyCreatureRequest(GameState GameState, Guid EnclaveId, CreatureType CreatureType);
+// ── Request Records ───────────────────────────────────────────────────────────
+public record PurchaseCreatureRequest(GameState GameState, Guid EnclaveId, CreatureType CreatureType);
 public record TransferCreatureRequest(GameState GameState, Guid SourceEnclaveId, Guid TargetEnclaveId, Guid CreatureId);
 public record BuildFacilityRequest(GameState GameState, Guid EnclaveId, FacilityType FacilityType);
 public record FeedCreatureRequest(GameState GameState, Guid CreatureId, int FoodAmount);
