@@ -1,41 +1,38 @@
-# ── Stage 1: Restore & Build ──────────────────────────────────────────────────
+# ── Stage 1: Build ────────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copiar project files primero para aprovechar cache de capas
-COPY src/DuneArrakis.Domain/DuneArrakis.Domain.csproj               src/DuneArrakis.Domain/
-COPY src/DuneArrakis.SimulationService/DuneArrakis.SimulationService.csproj  src/DuneArrakis.SimulationService/
-COPY tests/DuneArrakis.Tests/DuneArrakis.Tests.csproj               tests/DuneArrakis.Tests/
+# Copiar archivos de proyecto para cache de capas
+COPY ["src/DuneArrakis.Domain/DuneArrakis.Domain.csproj", "src/DuneArrakis.Domain/"]
+COPY ["src/DuneArrakis.SimulationService/DuneArrakis.SimulationService.csproj", "src/DuneArrakis.SimulationService/"]
 
-# Restore NuGet packages
-RUN dotnet restore src/DuneArrakis.SimulationService/DuneArrakis.SimulationService.csproj
+# Restore
+RUN dotnet restore "src/DuneArrakis.SimulationService/DuneArrakis.SimulationService.csproj"
 
-# Copiar todo el código fuente
+# Copiar resto del código
 COPY . .
 
-# Publicar en Release
-RUN dotnet publish src/DuneArrakis.SimulationService/DuneArrakis.SimulationService.csproj \
+# Build & Publish
+RUN dotnet publish "src/DuneArrakis.SimulationService/DuneArrakis.SimulationService.csproj" \
     -c Release \
     -o /app/publish \
-    --no-restore \
-    --nologo
+    --no-restore
 
-# ── Stage 2: Runtime (imagen mínima) ──────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+# ── Stage 2: Final ────────────────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
+EXPOSE 8080
+EXPOSE 80
 
-# Crear usuario no-root por seguridad
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
-
-COPY --from=build /app/publish .
-
-# Railway inyecta PORT via variable de entorno
-ENV ASPNETCORE_URLS=http://+:${PORT:-5000}
+# Railway inyecta PORT, AspNet usa PORT para configurar las URLs automáticamente
+ENV ASPNETCORE_URLS=http://+:${PORT:-8080}
 ENV ASPNETCORE_ENVIRONMENT=Production
 
-# Cambiar al usuario no-root
-USER appuser
+# Copiar binarios
+COPY --from=build /app/publish .
 
-EXPOSE 5000
+# Crear usuario para seguridad
+RUN adduser --disabled-password --gecos "" appuser && chown -R appuser /app
+USER appuser
 
 ENTRYPOINT ["dotnet", "DuneArrakis.SimulationService.dll"]

@@ -159,7 +159,21 @@ export default function GamePage() {
 
   const clearError = () => setError(null);
 
+  const [health, setHealth] = useState<{ status: string; version: string } | null>(null);
+  const [isWakingUp, setIsWakingUp] = useState(false);
+
   // ── Handlers ────────────────────────────────────────────────────────────────
+
+  // Efecto inicial para checkear salud
+  useState(() => {
+    const check = async () => {
+      setIsWakingUp(true);
+      const data = await api.checkHealth();
+      setHealth(data);
+      setIsWakingUp(false);
+    };
+    check();
+  });
 
   const handleNewGame = useCallback(async () => {
     setLoading(true);
@@ -242,6 +256,25 @@ export default function GamePage() {
       <div className="fixed inset-0 bg-gradient-to-br from-sand-950 via-sand-900 to-[#0d0a06] -z-10" />
       <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(196,150,58,0.08)_0%,transparent_60%)] -z-10" />
 
+      {/* Sand Particle Effect Overlay */}
+      <div className="fixed inset-0 pointer-events-none -z-5 opacity-30">
+        {[...Array(20)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full bg-gold/40"
+            style={{
+              width: Math.random() * 3 + 1 + 'px',
+              height: Math.random() * 3 + 1 + 'px',
+              left: Math.random() * 100 + '%',
+              top: Math.random() * 100 + '%',
+              filter: 'blur(1px)',
+              animation: `shimmer ${Math.random() * 10 + 10}s linear infinite`,
+              animationDelay: `-${Math.random() * 10}s`
+            }}
+          />
+        ))}
+      </div>
+
       {/* ── HEADER ──────────────────────────────────────────────── */}
       <header className="border-b border-sand-700/50 bg-sand-900/60 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -252,6 +285,13 @@ export default function GamePage() {
             <p className="text-xs text-sand-500 tracking-widest mt-0.5">MULTI-AGENT ARCHITECTURE DEMO · 2026</p>
           </div>
           <div className="flex items-center gap-4">
+            {/* Backend Status Indicator */}
+            <div className="flex items-center gap-2 px-3 py-1 rounded bg-sand-950/50 border border-sand-800">
+              <span className={`w-1.5 h-1.5 rounded-full ${isWakingUp ? 'bg-warn animate-pulse' : (health ? 'bg-success shadow-[0_0_8px_rgba(68,255,136,0.5)]' : 'bg-danger')}`} />
+              <span className="text-[10px] tracking-widest text-sand-400 uppercase font-medium">
+                {isWakingUp ? 'Waking API...' : (health ? 'System Ready' : 'API Offline')}
+              </span>
+            </div>
             {scenario && (
               <>
                 <div className="text-right">

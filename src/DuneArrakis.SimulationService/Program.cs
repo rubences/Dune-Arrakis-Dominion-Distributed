@@ -9,12 +9,21 @@ var builder = WebApplication.CreateBuilder(args);
 // ──────────────────────────────────────────────────────────────────────────────
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("UnityClient", policy =>
+    options.AddPolicy("DunePolicy", policy =>
         policy
-            .SetIsOriginAllowed(_ => true)   // Unity no tiene origen HTTP fijo
+            .SetIsOriginAllowed(_ => true) 
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials());
+});
+
+// Soporte para proxies (Railway/Render)
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | 
+                              Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -110,11 +119,14 @@ app.UseSwaggerUI(c =>
     c.DocumentTitle = "Dune Arrakis — API Docs";
 });
 
-app.UseCors("UnityClient");
+app.UseForwardedHeaders();
 
-// Solo HTTPS en producción
+app.UseCors("DunePolicy");
+
 if (!app.Environment.IsDevelopment())
+{
     app.UseHttpsRedirection();
+}
 
 app.UseAuthorization();
 app.MapControllers();
