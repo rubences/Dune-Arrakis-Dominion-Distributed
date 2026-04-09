@@ -1,3 +1,14 @@
+# .NET Build artifacts
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.nupkg
+*.snupkg
+TestResults/
+saves/
+
 # Prerequisites
 *.d
 
