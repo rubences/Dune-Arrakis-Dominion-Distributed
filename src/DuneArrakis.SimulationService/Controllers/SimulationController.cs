@@ -2,6 +2,7 @@ using DuneArrakis.Domain.Entities;
 using DuneArrakis.Domain.Enums;
 using DuneArrakis.SimulationService.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace DuneArrakis.SimulationService.Controllers;
 
@@ -13,6 +14,7 @@ public class SimulationController : ControllerBase
     private readonly ICrewAiAdvisor _crewAiAdvisor;
     private readonly ICrewAiClient _crewAiClient;
     private readonly IMonthlyDecisionAutomationService _monthlyDecisionAutomationService;
+    private readonly ICrewAiWebhookStore _webhookStore;
     private readonly ILogger<SimulationController> _logger;
 
     public SimulationController(
@@ -20,12 +22,14 @@ public class SimulationController : ControllerBase
         ICrewAiAdvisor crewAiAdvisor,
         ICrewAiClient crewAiClient,
         IMonthlyDecisionAutomationService monthlyDecisionAutomationService,
+        ICrewAiWebhookStore webhookStore,
         ILogger<SimulationController> logger)
     {
         _simulationEngine = simulationEngine;
         _crewAiAdvisor = crewAiAdvisor;
         _crewAiClient = crewAiClient;
         _monthlyDecisionAutomationService = monthlyDecisionAutomationService;
+        _webhookStore = webhookStore;
         _logger = logger;
     }
 
@@ -348,6 +352,14 @@ public class SimulationController : ControllerBase
             _logger.LogError(ex, "Error ejecutando la automatización mensual impulsada por CrewAI.");
             return StatusCode(502, "No se pudo completar la automatización mensual del crew.");
         }
+    }
+
+    [HttpPost("ai/webhooks/{source}")]
+    public IActionResult ReceiveCrewAiWebhook(string source, [FromBody] JsonElement payload)
+    {
+        _webhookStore.Store(source, payload);
+        _logger.LogInformation("Webhook de CrewAI recibido para source {Source}.", source);
+        return Accepted();
     }
 }
 

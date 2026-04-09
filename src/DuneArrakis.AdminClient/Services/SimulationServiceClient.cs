@@ -302,7 +302,20 @@ public class MonthlyAutomationResultDto
     public int AllocatedFoodUnits { get; set; }
     public List<Guid> ExecutedTransfers { get; set; } = new();
     public List<Guid> RegisteredLethargy { get; set; } = new();
+    public List<SimulationEventModelDto> GeneratedEvents { get; set; } = new();
     public MonthlyAutomationActionsDto? Actions { get; set; }
     public SimulationResultDto? SimulationResult { get; set; }
     public GameState? GameState { get; set; }
+}
+
+public class SimulationEventModelDto
+{
+    public Guid Id { get; set; }
+    public DateTime Timestamp { get; set; }
+    public int Month { get; set; }
+    public string EventType { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public decimal? SolarisChange { get; set; }
+    public Guid? CreatureId { get; set; }
+    public Guid? EnclaveId { get; set; }
 }

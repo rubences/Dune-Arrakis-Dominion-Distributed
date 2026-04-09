@@ -32,6 +32,7 @@ builder.Services.AddHttpClient<ICrewAiClient, CrewAiClient>((serviceProvider, cl
 
 builder.Services.AddSingleton<ISimulationEngine, SimulationEngine>();
 builder.Services.AddSingleton<ICrewAiAdvisor, CrewAiAdvisor>();
+builder.Services.AddSingleton<ICrewAiWebhookStore, CrewAiWebhookStore>();
 builder.Services.AddHttpClient<IDecisionCrewAiClient, DecisionCrewAiClient>((serviceProvider, client) =>
 {
     var options = serviceProvider.GetRequiredService<IOptions<DecisionCrewAiOptions>>().Value;

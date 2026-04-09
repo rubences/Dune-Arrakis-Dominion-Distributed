@@ -695,6 +695,39 @@ async Task ExecuteMonthlyAutomationAsync()
             PrintSuccess($"Suministros comprados: {result.PurchasedSupplyUnits}");
             PrintSuccess($"Alimento distribuido: {result.AllocatedFoodUnits}");
             PrintSuccess($"Traslados ejecutados: {result.ExecutedTransfers.Count}");
+
+            if (result.ExecutedTransfers.Count > 0 && currentGame is not null)
+            {
+                Console.WriteLine();
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine("  Criaturas trasladadas:");
+                Console.ResetColor();
+
+                foreach (var creatureId in result.ExecutedTransfers)
+                {
+                    var creature = currentGame.ActiveScenario.Enclaves
+                        .SelectMany(enclave => enclave.Creatures)
+                        .FirstOrDefault(item => item.Id == creatureId);
+
+                    if (creature is not null)
+                        Console.WriteLine($"  • {creature.Name} ({creature.Id})");
+                    else
+                        Console.WriteLine($"  • {creatureId}");
+                }
+            }
+        }
+
+        if (result.GeneratedEvents.Count > 0)
+        {
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("  Eventos creados por la automatización:");
+            Console.ResetColor();
+
+            foreach (var evt in result.GeneratedEvents.TakeLast(10))
+            {
+                Console.WriteLine($"  [{evt.EventType}] {evt.Description}");
+            }
         }
 
         if (result.SimulationResult is not null)

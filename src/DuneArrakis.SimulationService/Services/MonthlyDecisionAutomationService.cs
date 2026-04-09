@@ -24,17 +24,20 @@ public class MonthlyDecisionAutomationService : IMonthlyDecisionAutomationServic
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IDecisionCrewAiClient _decisionCrewAiClient;
+    private readonly ICrewAiWebhookStore _webhookStore;
     private readonly DecisionCrewAiOptions _options;
     private readonly ISimulationEngine _simulationEngine;
     private readonly ILogger<MonthlyDecisionAutomationService> _logger;
 
     public MonthlyDecisionAutomationService(
         IDecisionCrewAiClient decisionCrewAiClient,
+        ICrewAiWebhookStore webhookStore,
         IOptions<DecisionCrewAiOptions> options,
         ISimulationEngine simulationEngine,
         ILogger<MonthlyDecisionAutomationService> logger)
     {
         _decisionCrewAiClient = decisionCrewAiClient;
+        _webhookStore = webhookStore;
         _options = options.Value;
         _simulationEngine = simulationEngine;
         _logger = logger;
@@ -74,19 +77,10 @@ public class MonthlyDecisionAutomationService : IMonthlyDecisionAutomationServic
             };
         }
 
-        CrewAiExecutionStatus? latestStatus = null;
         var attempts = Math.Max(1, maxPollAttempts);
         var intervalSeconds = Math.Clamp(pollIntervalSeconds, 1, 30);
 
-        for (var attempt = 0; attempt < attempts; attempt++)
-        {
-            latestStatus = await _decisionCrewAiClient.GetStatusAsync(kickoff.KickoffId, cancellationToken);
-            if (latestStatus.IsTerminal)
-                break;
-
-            if (attempt < attempts - 1)
-                await Task.Delay(TimeSpan.FromSeconds(intervalSeconds), cancellationToken);
-        }
+        var latestStatus = await WaitForCompletionAsync(kickoff.KickoffId, attempts, intervalSeconds, cancellationToken);
 
         latestStatus ??= new CrewAiExecutionStatus
         {
@@ -106,13 +100,41 @@ public class MonthlyDecisionAutomationService : IMonthlyDecisionAutomationServic
             GameState = gameState
         };
 
+        var initialEventCount = gameState.ActiveScenario.EventLog.Count;
+
         if (executeActions)
             ApplyActions(gameState, result);
 
         if (processMonthAfterActions)
             result.SimulationResult = _simulationEngine.ProcessMonth(gameState);
 
+        result.GeneratedEvents = gameState.ActiveScenario.EventLog.Skip(initialEventCount).ToList();
+
         return result;
+    }
+
+    private async Task<CrewAiExecutionStatus?> WaitForCompletionAsync(string kickoffId, int attempts, int intervalSeconds, CancellationToken cancellationToken)
+    {
+        var timeout = TimeSpan.FromSeconds(attempts * intervalSeconds);
+        if (_options.HasWebhookBaseUrl)
+        {
+            var webhookStatus = await _webhookStore.WaitForStatusAsync(kickoffId, timeout, cancellationToken);
+            if (webhookStatus is not null)
+                return webhookStatus;
+        }
+
+        CrewAiExecutionStatus? latestStatus = null;
+        for (var attempt = 0; attempt < attempts; attempt++)
+        {
+            latestStatus = await _decisionCrewAiClient.GetStatusAsync(kickoffId, cancellationToken);
+            if (latestStatus.IsTerminal)
+                return latestStatus;
+
+            if (attempt < attempts - 1)
+                await Task.Delay(TimeSpan.FromSeconds(intervalSeconds), cancellationToken);
+        }
+
+        return latestStatus;
     }
 
     private async Task<CrewAiKickoffPayload> BuildPayloadAsync(GameState gameState, CancellationToken cancellationToken)
@@ -140,7 +162,10 @@ public class MonthlyDecisionAutomationService : IMonthlyDecisionAutomationServic
                 ["source"] = "DuneArrakis.SimulationService.MonthlyDecisionAutomationService",
                 ["saveName"] = gameState.SaveName,
                 ["month"] = gameState.ActiveScenario.CurrentMonth
-            }
+            },
+            CrewWebhookUrl = _options.HasWebhookBaseUrl
+                ? $"{_options.WebhookBaseUrl.TrimEnd('/')}/api/simulation/ai/webhooks/monthly"
+                : null
         };
     }
 
@@ -392,8 +417,8 @@ public class MonthlyDecisionAutomationService : IMonthlyDecisionAutomationServic
 public class MonthlyAutomationActions
 {
     public int ComprarSuministros { get; set; }
-    public List<string> TrasladarCriaturas { get; set; } = [];
-    public List<string> RegistrarLetargo { get; set; } = [];
+    public List<string> TrasladarCriaturas { get; set; } = new();
+    public List<string> RegistrarLetargo { get; set; } = new();
     public string? RawOutput { get; set; }
 }
 
@@ -407,8 +432,9 @@ public class MonthlyAutomationResult
     public bool ActionsApplied { get; set; }
     public int PurchasedSupplyUnits { get; set; }
     public int AllocatedFoodUnits { get; set; }
-    public List<Guid> ExecutedTransfers { get; set; } = [];
-    public List<Guid> RegisteredLethargy { get; set; } = [];
+    public List<Guid> ExecutedTransfers { get; set; } = new();
+    public List<Guid> RegisteredLethargy { get; set; } = new();
+    public List<SimulationEvent> GeneratedEvents { get; set; } = new();
     public MonthlyAutomationActions? Actions { get; set; }
     public SimulationResult? SimulationResult { get; set; }
     public GameState? GameState { get; set; }

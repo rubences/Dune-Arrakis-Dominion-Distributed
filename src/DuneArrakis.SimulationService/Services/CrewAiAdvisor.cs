@@ -22,11 +22,13 @@ public class CrewAiAdvisor : ICrewAiAdvisor
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly ICrewAiClient _crewAiClient;
+    private readonly ICrewAiWebhookStore _webhookStore;
     private readonly CrewAiOptions _options;
 
-    public CrewAiAdvisor(ICrewAiClient crewAiClient, IOptions<CrewAiOptions> options)
+    public CrewAiAdvisor(ICrewAiClient crewAiClient, ICrewAiWebhookStore webhookStore, IOptions<CrewAiOptions> options)
     {
         _crewAiClient = crewAiClient;
+        _webhookStore = webhookStore;
         _options = options.Value;
     }
 
@@ -64,15 +66,7 @@ public class CrewAiAdvisor : ICrewAiAdvisor
         var intervalSeconds = Math.Clamp(pollIntervalSeconds, 1, 30);
         CrewAiExecutionStatus? latestStatus = null;
 
-        for (var attempt = 0; attempt < attempts; attempt++)
-        {
-            latestStatus = await _crewAiClient.GetStatusAsync(kickoff.KickoffId, cancellationToken);
-            if (latestStatus.IsTerminal)
-                break;
-
-            if (attempt < attempts - 1)
-                await Task.Delay(TimeSpan.FromSeconds(intervalSeconds), cancellationToken);
-        }
+        latestStatus = await WaitForCompletionAsync(kickoff.KickoffId, attempts, intervalSeconds, cancellationToken);
 
         latestStatus ??= new CrewAiExecutionStatus
         {
@@ -89,6 +83,30 @@ public class CrewAiAdvisor : ICrewAiAdvisor
             Error = latestStatus.Error,
             RawResponse = latestStatus.RawJson
         };
+    }
+
+    private async Task<CrewAiExecutionStatus?> WaitForCompletionAsync(string kickoffId, int attempts, int intervalSeconds, CancellationToken cancellationToken)
+    {
+        var timeout = TimeSpan.FromSeconds(attempts * intervalSeconds);
+        if (_options.HasWebhookBaseUrl)
+        {
+            var webhookStatus = await _webhookStore.WaitForStatusAsync(kickoffId, timeout, cancellationToken);
+            if (webhookStatus is not null)
+                return webhookStatus;
+        }
+
+        CrewAiExecutionStatus? latestStatus = null;
+        for (var attempt = 0; attempt < attempts; attempt++)
+        {
+            latestStatus = await _crewAiClient.GetStatusAsync(kickoffId, cancellationToken);
+            if (latestStatus.IsTerminal)
+                return latestStatus;
+
+            if (attempt < attempts - 1)
+                await Task.Delay(TimeSpan.FromSeconds(intervalSeconds), cancellationToken);
+        }
+
+        return latestStatus;
     }
 
     private CrewAiKickoffPayload BuildPayload(GameState gameState, string prompt)
@@ -112,7 +130,10 @@ public class CrewAiAdvisor : ICrewAiAdvisor
                 ["scenario"] = scenario.Name,
                 ["timestampUtc"] = DateTime.UtcNow,
                 ["source"] = "DuneArrakis.SimulationService"
-            }
+            },
+            CrewWebhookUrl = _options.HasWebhookBaseUrl
+                ? $"{_options.WebhookBaseUrl.TrimEnd('/')}/api/simulation/ai/webhooks/strategic"
+                : null
         };
     }
 

@@ -171,6 +171,7 @@ public class CrewAiExecutionStatus
     public string? ResultText { get; set; }
     public string? Error { get; set; }
     public string RawJson { get; set; } = string.Empty;
+    public string? Source { get; set; }
 
     public bool IsTerminal =>
         string.Equals(Status, "completed", StringComparison.OrdinalIgnoreCase) ||
