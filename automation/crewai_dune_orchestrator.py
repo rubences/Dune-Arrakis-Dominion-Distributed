@@ -13,13 +13,6 @@ from typing import Any
 import requests
 from dotenv import load_dotenv
 
-try:
-    from crewai import Agent, Crew, Process, Task
-except ImportError as exc:
-    raise SystemExit(
-        "Missing dependency 'crewai'. Install dependencies with: pip install -r automation/requirements.txt"
-    ) from exc
-
 
 load_dotenv()
 
@@ -85,7 +78,20 @@ def build_project_context(improvement_goal: str) -> dict[str, str]:
     }
 
 
-def create_crew() -> Crew:
+def load_crewai():
+    try:
+        from crewai import Agent, Crew, Process, Task
+    except ImportError as exc:
+        raise SystemExit(
+            "Missing dependency 'crewai'. Install dependencies with: pip install -r automation/requirements.txt"
+        ) from exc
+
+    return Agent, Crew, Process, Task
+
+
+def create_crew():
+    Agent, Crew, Process, Task = load_crewai()
+
     software_architect = Agent(
         role="Software_Architect",
         goal=(

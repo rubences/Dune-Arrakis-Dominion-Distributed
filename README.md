@@ -56,3 +56,27 @@ Invocacion remota contra el deployment AMP:
 ```bash
 python automation/crewai_dune_orchestrator.py --mode remote --wait
 ```
+
+### Script de automatizacion mensual de decisiones
+
+Tambien se agrego automation/crewai_monthly_decision_automation.py para el segundo crew, orientado a ejecutar decisiones de juego por ronda con dos agentes:
+
+- Mentat_Financiero
+- Maestro_de_Bestias
+
+El script admite un archivo JSON con el estado de la partida y genera un archivo JSON con las acciones a ejecutar.
+
+Ejemplo local:
+
+```bash
+python automation/crewai_monthly_decision_automation.py --mode local --state-file game_state.json
+```
+
+Ejemplo remoto:
+
+```bash
+export CREWAI_API_URL="https://gaming-analytics-content-automation-v1-ef54-0203d4b9.crewai.com"
+export CREWAI_BEARER_TOKEN="..."
+export CREWAI_USER_BEARER_TOKEN="..."
+python automation/crewai_monthly_decision_automation.py --mode remote --wait --state-file game_state.json
+```
