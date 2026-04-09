@@ -180,3 +180,12 @@ Salida del reporte:
   - cambios de PATH
   - pendientes
   - errores o riesgos
+
+Guia especifica del modulo Windows:
+
+- [automation/windows/README.md](automation/windows/README.md)
+
+Tambien se agrego una tarea de VS Code para ejecutarlo directamente:
+
+- [.vscode/tasks.json](.vscode/tasks.json)
+- Task label: `Windows: Install OpenCode + Gentleman Stack`

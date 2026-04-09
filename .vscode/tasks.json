@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Windows: Install OpenCode + Gentleman Stack",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\automation\\windows\\install-gentleman-stack.ps1"
+      ],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          ".\\automation\\windows\\install-gentleman-stack.ps1"
+        ]
+      },
+      "problemMatcher": [],
+      "group": "build"
+    }
+  ]
+}

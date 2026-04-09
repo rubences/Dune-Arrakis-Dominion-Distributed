@@ -575,7 +575,9 @@ function Capture-Versions {
 function Write-InitialAudit {
     Write-Phase "FASE 1 - AUDITORIA INICIAL"
 
-    if (-not $IsWindows) {
+    $platform = [Environment]::OSVersion.Platform
+    $isWindows = $platform -eq [PlatformID]::Win32NT
+    if (-not $isWindows) {
         throw "This installer supports Windows native only."
     }
 
