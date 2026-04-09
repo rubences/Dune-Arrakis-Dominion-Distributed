@@ -20,6 +20,32 @@ Este modulo instala y usa las herramientas Gentleman directamente dentro del rep
 bash automation/local/bootstrap-gentleman-local.sh
 ```
 
+## Comando unico integrado al juego
+
+Ejecuta en un solo flujo:
+
+- `engram setup opencode`
+- `gentle-ai install --agent opencode --preset full-gentleman`
+- automatizacion mensual CrewAI existente del proyecto
+- revision GGA sobre cambios staged de simulacion/tests
+
+```bash
+bash automation/local/run-game-ai-stack.sh
+```
+
+Opciones utiles:
+
+```bash
+# Solo configurar stack local (sin CrewAI ni GGA)
+bash automation/local/run-game-ai-stack.sh --skip-crewai --skip-gga
+
+# CrewAI remoto con espera
+bash automation/local/run-game-ai-stack.sh --crewai-mode remote --wait-remote
+
+# CrewAI con estado de juego custom
+bash automation/local/run-game-ai-stack.sh --state-file /ruta/game_state.json
+```
+
 ## Usar herramientas en la shell actual
 
 ```bash

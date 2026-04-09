@@ -2,6 +2,26 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Local: Game AI Stack (Gentleman + CrewAI)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "automation/local/run-game-ai-stack.sh"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Local: Game AI Stack Quick (no CrewAI/GGA)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "automation/local/run-game-ai-stack.sh",
+        "--skip-crewai",
+        "--skip-gga"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "Windows: Sync Gentleman Repos",
       "type": "shell",
       "command": "powershell",

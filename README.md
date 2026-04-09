@@ -205,6 +205,19 @@ bash automation/local/bootstrap-gentleman-local.sh
 source automation/local/use-gentleman-tools.sh
 ```
 
+Comando unico para integrarlo con el juego y CrewAI:
+
+```bash
+bash automation/local/run-game-ai-stack.sh
+```
+
+Este flujo ejecuta en cadena:
+
+- setup de Engram para OpenCode
+- preset full-gentleman de gentle-ai
+- automatizacion mensual CrewAI ya implementada en `automation/crewai_monthly_decision_automation.py`
+- revision GGA sobre cambios staged en `src/DuneArrakis.SimulationService` y `tests/DuneArrakis.Tests`
+
 Esto deja disponibles, dentro del propio proyecto:
 
 - `automation/tools/bin/engram`
