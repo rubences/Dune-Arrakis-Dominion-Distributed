@@ -52,6 +52,7 @@ bash automation/local/run-game-ai-stack.sh --skip-bootstrap --skip-crewai --gga-
 Task de VS Code recomendada para este flujo:
 
 - `Local: Auto-Stage Simulation + GGA Review`
+- `Local: Auto-Stage + Full Game AI Stack` (incluye CrewAI)
 
 ## Usar herramientas en la shell actual
 

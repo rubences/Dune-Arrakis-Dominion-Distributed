@@ -218,6 +218,11 @@ Este flujo ejecuta en cadena:
 - automatizacion mensual CrewAI ya implementada en `automation/crewai_monthly_decision_automation.py`
 - revision GGA sobre cambios staged en `src/DuneArrakis.SimulationService` y `tests/DuneArrakis.Tests`
 
+Tasks nuevas en VS Code para ejecucion sin friccion:
+
+- `Local: Auto-Stage Simulation + GGA Review`
+- `Local: Auto-Stage + Full Game AI Stack` (complementado con CrewAI)
+
 Esto deja disponibles, dentro del propio proyecto:
 
 - `automation/tools/bin/engram`
