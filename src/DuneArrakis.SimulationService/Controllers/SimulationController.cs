@@ -10,11 +10,19 @@ namespace DuneArrakis.SimulationService.Controllers;
 public class SimulationController : ControllerBase
 {
     private readonly ISimulationEngine _simulationEngine;
+    private readonly ICrewAiAdvisor _crewAiAdvisor;
+    private readonly ICrewAiClient _crewAiClient;
     private readonly ILogger<SimulationController> _logger;
 
-    public SimulationController(ISimulationEngine simulationEngine, ILogger<SimulationController> logger)
+    public SimulationController(
+        ISimulationEngine simulationEngine,
+        ICrewAiAdvisor crewAiAdvisor,
+        ICrewAiClient crewAiClient,
+        ILogger<SimulationController> logger)
     {
         _simulationEngine = simulationEngine;
+        _crewAiAdvisor = crewAiAdvisor;
+        _crewAiClient = crewAiClient;
         _logger = logger;
     }
 
@@ -187,9 +195,137 @@ public class SimulationController : ControllerBase
 
     [HttpGet("health")]
     public IActionResult HealthCheck() => Ok(new { status = "healthy", service = "SimulationService" });
+
+    [HttpGet("ai/health")]
+    public async Task<IActionResult> GetCrewAiHealth(CancellationToken cancellationToken)
+    {
+        if (!_crewAiClient.IsConfigured)
+        {
+            return Ok(new CrewAiHealthResponse(false, "not-configured", Array.Empty<string>(),
+                "Configure CrewAi:BaseUrl y CrewAi:BearerToken para habilitar la integración."));
+        }
+
+        try
+        {
+            var inputs = await _crewAiClient.GetRequiredInputsAsync(cancellationToken);
+            return Ok(new CrewAiHealthResponse(true, "online", inputs, null));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No se pudo consultar el estado de CrewAI.");
+            return StatusCode(502, new CrewAiHealthResponse(true, "unreachable", Array.Empty<string>(), ex.Message));
+        }
+    }
+
+    [HttpGet("ai/inputs")]
+    public async Task<ActionResult<IReadOnlyList<string>>> GetCrewAiInputs(CancellationToken cancellationToken)
+    {
+        if (!_crewAiClient.IsConfigured)
+            return BadRequest("La integración con CrewAI no está configurada.");
+
+        try
+        {
+            var inputs = await _crewAiClient.GetRequiredInputsAsync(cancellationToken);
+            return Ok(inputs);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error obteniendo inputs requeridos de CrewAI.");
+            return StatusCode(502, "No se pudieron consultar los inputs requeridos del crew.");
+        }
+    }
+
+    [HttpPost("ai/kickoff")]
+    public async Task<ActionResult<CrewAiKickoffResult>> StartCrewAiKickoff(
+        [FromBody] CrewAiKickoffApiRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!_crewAiClient.IsConfigured)
+            return BadRequest("La integración con CrewAI no está configurada.");
+
+        if (request is null || request.Inputs.Count == 0)
+            return BadRequest("Debe proporcionar al menos un input para el crew.");
+
+        try
+        {
+            var result = await _crewAiClient.KickoffAsync(new CrewAiKickoffPayload
+            {
+                Inputs = request.Inputs,
+                Meta = request.Meta
+            }, cancellationToken);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error iniciando ejecución en CrewAI.");
+            return StatusCode(502, "No se pudo iniciar la ejecución del crew.");
+        }
+    }
+
+    [HttpGet("ai/status/{kickoffId}")]
+    public async Task<ActionResult<CrewAiExecutionStatus>> GetCrewAiStatus(
+        string kickoffId,
+        CancellationToken cancellationToken)
+    {
+        if (!_crewAiClient.IsConfigured)
+            return BadRequest("La integración con CrewAI no está configurada.");
+
+        try
+        {
+            var status = await _crewAiClient.GetStatusAsync(kickoffId, cancellationToken);
+            return Ok(status);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error consultando estado de CrewAI para kickoff {KickoffId}.", kickoffId);
+            return StatusCode(502, "No se pudo consultar el estado del crew.");
+        }
+    }
+
+    [HttpPost("ai/strategic-advice")]
+    public async Task<ActionResult<CrewAiStrategicAdviceResult>> GetStrategicAdvice(
+        [FromBody] CrewAiStrategicAdviceRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null || request.GameState is null)
+            return BadRequest("Debe proporcionar un estado del juego válido.");
+
+        if (string.IsNullOrWhiteSpace(request.Prompt))
+            return BadRequest("Debe proporcionar una instrucción para el crew.");
+
+        try
+        {
+            var result = await _crewAiAdvisor.GetStrategicAdviceAsync(
+                request.GameState,
+                request.Prompt,
+                request.WaitForCompletion,
+                request.MaxPollAttempts,
+                request.PollIntervalSeconds,
+                cancellationToken);
+
+            if (!result.Configured)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error obteniendo asesoría estratégica de CrewAI.");
+            return StatusCode(502, "No se pudo completar la consulta al crew.");
+        }
+    }
 }
 
 public record BuyCreatureRequest(GameState GameState, Guid EnclaveId, CreatureType CreatureType);
 public record TransferCreatureRequest(GameState GameState, Guid SourceEnclaveId, Guid TargetEnclaveId, Guid CreatureId);
 public record BuildFacilityRequest(GameState GameState, Guid EnclaveId, FacilityType FacilityType);
 public record FeedCreatureRequest(GameState GameState, Guid CreatureId, int FoodAmount);
+public record CrewAiKickoffApiRequest(Dictionary<string, string> Inputs, Dictionary<string, object?>? Meta);
+public record CrewAiStrategicAdviceRequest(
+    GameState GameState,
+    string Prompt,
+    bool WaitForCompletion = true,
+    int MaxPollAttempts = 10,
+    int PollIntervalSeconds = 3);
+public record CrewAiHealthResponse(bool Configured, string Status, IReadOnlyList<string> RequiredInputs, string? Error);
