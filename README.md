@@ -189,3 +189,26 @@ Tambien se agrego una tarea de VS Code para ejecutarlo directamente:
 
 - [.vscode/tasks.json](.vscode/tasks.json)
 - Task label: `Windows: Install OpenCode + Gentleman Stack`
+
+## Stack Gentleman local (dentro del repositorio)
+
+Si prefieres usar todo dentro de este repo (sin instalacion global), usa este flujo local:
+
+- Guia: [automation/local/README.md](automation/local/README.md)
+- Bootstrap local: `automation/local/bootstrap-gentleman-local.sh`
+- Activacion de PATH en shell actual: `automation/local/use-gentleman-tools.sh`
+
+Comando recomendado:
+
+```bash
+bash automation/local/bootstrap-gentleman-local.sh
+source automation/local/use-gentleman-tools.sh
+```
+
+Esto deja disponibles, dentro del propio proyecto:
+
+- `automation/tools/bin/engram`
+- `automation/tools/bin/gentle-ai`
+- `automation/tools/bin/gga`
+- `automation/tools/skills/curated`
+- `automation/tools/skills/community`
