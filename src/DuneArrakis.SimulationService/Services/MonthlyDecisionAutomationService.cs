@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using DuneArrakis.Domain.Entities;
 using DuneArrakis.Domain.Enums;
 using Microsoft.Extensions.Options;
@@ -416,9 +417,15 @@ public class MonthlyDecisionAutomationService : IMonthlyDecisionAutomationServic
 
 public class MonthlyAutomationActions
 {
+    [JsonPropertyName("comprar_suministros")]
     public int ComprarSuministros { get; set; }
+
+    [JsonPropertyName("trasladar_criaturas")]
     public List<string> TrasladarCriaturas { get; set; } = new();
+
+    [JsonPropertyName("registrar_letargo")]
     public List<string> RegistrarLetargo { get; set; } = new();
+
     public string? RawOutput { get; set; }
 }
 
