@@ -34,14 +34,14 @@ public class SimulationController : ControllerBase
     }
 
     [HttpPost("process-month")]
-    public ActionResult<SimulationResult> ProcessMonth([FromBody] GameState gameState)
+    public async Task<ActionResult<SimulationResult>> ProcessMonth([FromBody] GameState gameState)
     {
         if (gameState is null || gameState.ActiveScenario is null)
             return BadRequest("El estado del juego no puede ser nulo.");
 
         try
         {
-            var result = _simulationEngine.ProcessMonth(gameState);
+            var result = await _simulationEngine.ProcessMonthAsync(gameState);
             return Ok(result);
         }
         catch (Exception ex)

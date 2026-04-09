@@ -8,7 +8,13 @@ namespace DuneArrakis.Tests;
 public class SimulationEngineTests
 {
     private static SimulationEngine CreateEngine() =>
-        new(NullLogger<SimulationEngine>.Instance);
+        new(NullLogger<SimulationEngine>.Instance, new DummyPublisher());
+
+    private class DummyPublisher : MediatR.IPublisher
+    {
+        public Task Publish(object notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default) where TNotification : MediatR.INotification => Task.CompletedTask;
+    }
 
     private static GameState CreateTestGameState()
     {
@@ -19,19 +25,19 @@ public class SimulationEngineTests
     }
 
     [Fact]
-    public void ProcessMonth_AdvancesMonthCounter()
+    public async Task ProcessMonth_AdvancesMonthCounter()
     {
         var engine = CreateEngine();
         var gameState = CreateTestGameState();
         var initialMonth = gameState.ActiveScenario.CurrentMonth;
 
-        engine.ProcessMonth(gameState);
+        await engine.ProcessMonthAsync(gameState);
 
         Assert.Equal(initialMonth + 1, gameState.ActiveScenario.CurrentMonth);
     }
 
     [Fact]
-    public void ProcessMonth_WithOptimalFeedingCreature_HealthIncreases()
+    public async Task ProcessMonth_WithOptimalFeedingCreature_HealthIncreases()
     {
         var engine = CreateEngine();
         var gameState = CreateTestGameState();
@@ -45,13 +51,13 @@ public class SimulationEngineTests
         creature.EnclaveId = enclave.Id;
         enclave.Creatures.Add(creature);
 
-        engine.ProcessMonth(gameState);
+        await engine.ProcessMonthAsync(gameState);
 
         Assert.Equal(85, creature.Health); // +5 for optimal feeding
     }
 
     [Fact]
-    public void ProcessMonth_WithNoFeeding_HealthDecreasesByThirty()
+    public async Task ProcessMonth_WithNoFeeding_HealthDecreasesByThirty()
     {
         var engine = CreateEngine();
         var gameState = CreateTestGameState();
@@ -64,13 +70,13 @@ public class SimulationEngineTests
         creature.EnclaveId = enclave.Id;
         enclave.Creatures.Add(creature);
 
-        engine.ProcessMonth(gameState);
+        await engine.ProcessMonthAsync(gameState);
 
         Assert.Equal(50, creature.Health); // -30 for starvation
     }
 
     [Fact]
-    public void ProcessMonth_WithPartialFeeding25To75_HealthDecreasesByTwenty()
+    public async Task ProcessMonth_WithPartialFeeding25To75_HealthDecreasesByTwenty()
     {
         var engine = CreateEngine();
         var gameState = CreateTestGameState();
@@ -84,13 +90,13 @@ public class SimulationEngineTests
         creature.EnclaveId = enclave.Id;
         enclave.Creatures.Add(creature);
 
-        engine.ProcessMonth(gameState);
+        await engine.ProcessMonthAsync(gameState);
 
         Assert.Equal(60, creature.Health); // -20
     }
 
     [Fact]
-    public void ProcessMonth_WithPartialFeeding75To100_HealthDecreasesByTen()
+    public async Task ProcessMonth_WithPartialFeeding75To100_HealthDecreasesByTen()
     {
         var engine = CreateEngine();
         var gameState = CreateTestGameState();
@@ -104,13 +110,13 @@ public class SimulationEngineTests
         creature.EnclaveId = enclave.Id;
         enclave.Creatures.Add(creature);
 
-        engine.ProcessMonth(gameState);
+        await engine.ProcessMonthAsync(gameState);
 
         Assert.Equal(70, creature.Health); // -10
     }
 
     [Fact]
-    public void ProcessMonth_WhenHealthReachesZero_CreatureDies()
+    public async Task ProcessMonth_WhenHealthReachesZero_CreatureDies()
     {
         var engine = CreateEngine();
         var gameState = CreateTestGameState();
@@ -123,14 +129,14 @@ public class SimulationEngineTests
         creature.EnclaveId = enclave.Id;
         enclave.Creatures.Add(creature);
 
-        engine.ProcessMonth(gameState);
+        await engine.ProcessMonthAsync(gameState);
 
         Assert.False(creature.IsAlive);
         Assert.Equal(0, creature.Health);
     }
 
     [Fact]
-    public void ProcessMonth_ExhibicionEnclave_GeneratesVisitorRevenue()
+    public async Task ProcessMonth_ExhibicionEnclave_GeneratesVisitorRevenue()
     {
         var engine = CreateEngine();
         var gameState = CreateTestGameState();
@@ -144,14 +150,14 @@ public class SimulationEngineTests
         creature.EnclaveId = enclave.Id;
         enclave.Creatures.Add(creature);
 
-        engine.ProcessMonth(gameState);
+        await engine.ProcessMonthAsync(gameState);
 
         // Visitors should generate revenue
         Assert.True(enclave.TotalVisitorsThisMonth > 0);
     }
 
     [Fact]
-    public void ProcessMonth_AclimatacionEnclave_NoVisitors()
+    public async Task ProcessMonth_AclimatacionEnclave_NoVisitors()
     {
         var engine = CreateEngine();
         var scenario = Scenario.CreateArrakeen();
@@ -163,13 +169,13 @@ public class SimulationEngineTests
         creature.EnclaveId = aclimatacion.Id;
         aclimatacion.Creatures.Add(creature);
 
-        engine.ProcessMonth(gameState);
+        await engine.ProcessMonthAsync(gameState);
 
         Assert.Equal(0, aclimatacion.TotalVisitorsThisMonth);
     }
 
     [Fact]
-    public void ProcessMonth_AppliesMaintenanceCosts()
+    public async Task ProcessMonth_AppliesMaintenanceCosts()
     {
         var engine = CreateEngine();
         var scenario = Scenario.CreateArrakeen();
@@ -180,7 +186,7 @@ public class SimulationEngineTests
         var gameState = GameState.NewGame(scenario, "TestMaintenance");
         var initialSolaris = scenario.CurrentSolaris;
 
-        engine.ProcessMonth(gameState);
+        await engine.ProcessMonthAsync(gameState);
 
         // Maintenance cost should be deducted
         Assert.True(scenario.CurrentSolaris < initialSolaris);

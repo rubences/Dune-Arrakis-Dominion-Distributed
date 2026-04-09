@@ -11,6 +11,15 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new() { Title = "Dune Simulation Service", Version = "v1" });
 });
 
+// Orquestación Multi-Agente con MediatR
+builder.Services.AddMediatR(cfg => 
+{
+    cfg.RegisterServicesFromAssemblyContaining<Program>();
+    // Configuramos publicador paralelo para que ambos agentes (Logistics y Strategic) se ejecuten en paralelo simultáneamente
+    cfg.NotificationPublisher = new MediatR.NotificationPublishers.TaskWhenAllPublisher();
+    cfg.NotificationPublisherType = typeof(MediatR.NotificationPublishers.TaskWhenAllPublisher);
+});
+
 builder.Services.AddOptions<CrewAiOptions>()
     .Bind(builder.Configuration.GetSection(CrewAiOptions.SectionName));
 

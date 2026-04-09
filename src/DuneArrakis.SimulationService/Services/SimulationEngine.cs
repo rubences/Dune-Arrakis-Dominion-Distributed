@@ -1,16 +1,19 @@
 using DuneArrakis.Domain.Entities;
 using DuneArrakis.Domain.Enums;
+using DuneArrakis.SimulationService.Events;
+using MediatR;
 
 namespace DuneArrakis.SimulationService.Services;
 
 public interface ISimulationEngine
 {
-    SimulationResult ProcessMonth(GameState gameState);
+    Task<SimulationResult> ProcessMonthAsync(GameState gameState, CancellationToken cancellationToken = default);
 }
 
 public class SimulationEngine : ISimulationEngine
 {
     private readonly ILogger<SimulationEngine> _logger;
+    private readonly IPublisher _publisher;
     private static readonly Random Rng = new();
 
     private const int HealthLossHighStarvation = 30;
@@ -20,12 +23,13 @@ public class SimulationEngine : ISimulationEngine
     private const double ReproductionSuccessRate = 0.20;
     private const int MinHealthForTransfer = 75;
 
-    public SimulationEngine(ILogger<SimulationEngine> logger)
+    public SimulationEngine(ILogger<SimulationEngine> logger, IPublisher publisher)
     {
         _logger = logger;
+        _publisher = publisher;
     }
 
-    public SimulationResult ProcessMonth(GameState gameState)
+    public async Task<SimulationResult> ProcessMonthAsync(GameState gameState, CancellationToken cancellationToken = default)
     {
         var scenario = gameState.ActiveScenario;
         var events = new List<SimulationEvent>();
@@ -41,6 +45,10 @@ public class SimulationEngine : ISimulationEngine
 
         scenario.CurrentMonth++;
         scenario.EventLog.AddRange(events);
+
+        // Notificar a los agentes orquestados (en paralelo)
+        var monthEndedEvent = new SimulationMonthEndedEvent(gameState);
+        await _publisher.Publish(monthEndedEvent, cancellationToken);
 
         return new SimulationResult
         {
