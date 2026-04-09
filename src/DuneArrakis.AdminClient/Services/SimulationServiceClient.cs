@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using DuneArrakis.Domain.Entities;
 using DuneArrakis.Domain.Enums;
 using Microsoft.Extensions.Logging;
@@ -152,6 +153,59 @@ public class SimulationServiceClient
             return false;
         }
     }
+
+    public async Task<CrewAiHealthDto?> GetCrewAiHealthAsync()
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("api/simulation/ai/health");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<CrewAiHealthDto>(JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error consultando el estado de CrewAI.");
+            return null;
+        }
+    }
+
+    public async Task<CrewAiStrategicAdviceDto?> GetStrategicAdviceAsync(
+        GameState gameState,
+        string prompt,
+        bool waitForCompletion = true,
+        int maxPollAttempts = 10,
+        int pollIntervalSeconds = 3)
+    {
+        try
+        {
+            var request = new
+            {
+                gameState,
+                prompt,
+                waitForCompletion,
+                maxPollAttempts,
+                pollIntervalSeconds
+            };
+
+            var response = await _httpClient.PostAsJsonAsync("api/simulation/ai/strategic-advice", request, JsonOptions);
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new InvalidOperationException(error.Trim('"'));
+            }
+
+            return await response.Content.ReadFromJsonAsync<CrewAiStrategicAdviceDto>(JsonOptions);
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error consultando asesoría estratégica en CrewAI.");
+            throw new InvalidOperationException("Error de conexión con la integración de CrewAI.");
+        }
+    }
 }
 
 public class SimulationResultDto
@@ -167,4 +221,24 @@ public class SimulationEventDto
     public string EventType { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public decimal? SolarisChange { get; set; }
+}
+
+public class CrewAiHealthDto
+{
+    public bool Configured { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public List<string> RequiredInputs { get; set; } = [];
+    public string? Error { get; set; }
+}
+
+public class CrewAiStrategicAdviceDto
+{
+    public bool Configured { get; set; }
+    public string KickoffId { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string? Advice { get; set; }
+    public string? Error { get; set; }
+
+    [JsonPropertyName("rawResponse")]
+    public string? RawResponse { get; set; }
 }

@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 
 namespace DuneArrakis.SimulationService.Services;
@@ -131,12 +132,12 @@ public class CrewAiClient : ICrewAiClient
 
 public class CrewAiInputsEnvelope
 {
-    public List<string> Inputs { get; set; } = [];
+    public List<string> Inputs { get; set; } = new();
 }
 
 public class CrewAiKickoffPayload
 {
-    public Dictionary<string, string> Inputs { get; set; } = [];
+    public Dictionary<string, string> Inputs { get; set; } = new();
     public Dictionary<string, object?>? Meta { get; set; }
     public string? TaskWebhookUrl { get; set; }
     public string? StepWebhookUrl { get; set; }
@@ -145,6 +146,7 @@ public class CrewAiKickoffPayload
 
 public class CrewAiKickoffResult
 {
+    [JsonPropertyName("kickoff_id")]
     public string KickoffId { get; set; } = string.Empty;
 }
 

@@ -54,6 +54,7 @@ async Task RunMainMenuAsync()
         Console.WriteLine("  [5] Gestionar enclaves y criaturas");
         Console.WriteLine("  [6] Avanzar mes (simulación)");
         Console.WriteLine("  [7] Ver registro de eventos");
+        Console.WriteLine("  [8] Consultar asesor estratégico CrewAI");
         Console.WriteLine("  [0] Salir");
         PrintSeparator();
         Console.Write("  Selección: ");
@@ -68,6 +69,7 @@ async Task RunMainMenuAsync()
             case "5": await ManageEnclavesMenuAsync(); break;
             case "6": await AdvanceMonthAsync(); break;
             case "7": ShowEventLog(); break;
+            case "8": await ConsultCrewAiAdvisorAsync(); break;
             case "0":
                 PrintInfo("¡Hasta pronto, Administrator!");
                 return;
@@ -564,6 +566,80 @@ void ShowEventLog()
         Console.Write($"[{evt.EventType,-12}]");
         Console.ResetColor();
         Console.WriteLine($" {evt.Description}");
+    }
+}
+
+async Task ConsultCrewAiAdvisorAsync()
+{
+    if (currentGame is null) { PrintError("No hay partida activa."); return; }
+
+    var available = await simulationClient.IsAvailableAsync();
+    if (!available)
+    {
+        PrintError("Servicio de simulación no disponible. Inicie DuneArrakis.SimulationService.");
+        return;
+    }
+
+    var aiHealth = await simulationClient.GetCrewAiHealthAsync();
+    if (aiHealth is null)
+    {
+        PrintError("No se pudo consultar el estado de CrewAI.");
+        return;
+    }
+
+    if (!aiHealth.Configured)
+    {
+        PrintError(aiHealth.Error ?? "La integración con CrewAI no está configurada.");
+        return;
+    }
+
+    PrintHeader("ASESOR ESTRATÉGICO CREWAI");
+    Console.WriteLine($"  Estado del crew: {aiHealth.Status}");
+    if (aiHealth.RequiredInputs.Count > 0)
+        Console.WriteLine($"  Inputs detectados: {string.Join(", ", aiHealth.RequiredInputs)}");
+
+    Console.WriteLine();
+    Console.WriteLine("  Instrucción recomendada: analizar el estado y proponer acciones para el próximo mes.");
+    Console.Write("  Prompt para el crew (Enter para usar el recomendado): ");
+    var prompt = Console.ReadLine()?.Trim();
+    if (string.IsNullOrWhiteSpace(prompt))
+        prompt = "Analiza el estado actual de Arrakis Dominion y propone las tres mejores acciones priorizadas para el próximo mes, explicando riesgos, coste estimado y beneficio esperado.";
+
+    try
+    {
+        var advice = await simulationClient.GetStrategicAdviceAsync(currentGame, prompt);
+        if (advice is null)
+        {
+            PrintError("CrewAI no devolvió una respuesta interpretable.");
+            return;
+        }
+
+        Console.WriteLine();
+        PrintSuccess($"Ejecución enviada a CrewAI. Kickoff: {advice.KickoffId}");
+        PrintInfo($"Estado: {advice.Status}");
+
+        if (!string.IsNullOrWhiteSpace(advice.Advice))
+        {
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("  Recomendación del crew:");
+            Console.ResetColor();
+            Console.WriteLine();
+            foreach (var line in advice.Advice.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                Console.WriteLine($"  {line}");
+        }
+        else if (!string.IsNullOrWhiteSpace(advice.Error))
+        {
+            PrintError(advice.Error);
+        }
+        else
+        {
+            PrintInfo("La ejecución sigue en curso. Consulte el estado con el kickoff devuelto desde el endpoint de simulación.");
+        }
+    }
+    catch (InvalidOperationException ex)
+    {
+        PrintError(ex.Message);
     }
 }
 

@@ -8,6 +8,10 @@ obj/
 *.snupkg
 TestResults/
 saves/
+.env
+.venv/
+__pycache__/
+*.pyc
 
 # Prerequisites
 *.d
