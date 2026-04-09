@@ -1,0 +1,173 @@
+/* ============================================================
+   Dune Arrakis Dominion — Global CSS
+   Paleta: arena dorada + negro profundo + azul holográfico
+   ============================================================ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Custom Properties ──────────────────────────────────────── */
+:root {
+  --sand-950:  #080604;
+  --sand-900:  #100d08;
+  --sand-800:  #1a1410;
+  --sand-700:  #2a2016;
+  --sand-600:  #3d2e1a;
+  --sand-500:  #7a5c30;
+  --sand-400:  #c4963a;
+  --sand-300:  #e0b860;
+  --sand-200:  #f0d090;
+  --sand-100:  #f8ecd4;
+  --gold:      #ffd700;
+  --holo:      #00b4d8;
+  --holo-dim:  #0077a0;
+  --danger:    #ff4455;
+  --success:   #44ff88;
+  --warning:   #ffcc44;
+}
+
+/* ── Base ───────────────────────────────────────────────────── */
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background-color: var(--sand-950);
+    color: var(--sand-100);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4 { font-family: 'Cinzel', serif; }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--sand-900); }
+  ::-webkit-scrollbar-thumb { background: var(--sand-600); border-radius: 2px; }
+}
+
+/* ── Utilities ──────────────────────────────────────────────── */
+@layer utilities {
+  .font-cinzel   { font-family: 'Cinzel', serif; }
+  .font-rajdhani { font-family: 'Rajdhani', sans-serif; }
+
+  .text-gold    { color: var(--gold); }
+  .text-holo    { color: var(--holo); }
+  .text-danger  { color: var(--danger); }
+  .text-success { color: var(--success); }
+  .text-warn    { color: var(--warning); }
+
+  .bg-panel {
+    background: rgba(26, 20, 16, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(196, 150, 58, 0.2);
+  }
+
+  .border-sand  { border-color: rgba(196, 150, 58, 0.25); }
+  .border-holo  { border-color: rgba(0, 180, 216, 0.4); }
+
+  .glow-gold  { box-shadow: 0 0 12px rgba(255, 215, 0, 0.25); }
+  .glow-holo  { box-shadow: 0 0 16px rgba(0, 180, 216, 0.3); }
+  .glow-danger{ box-shadow: 0 0 12px rgba(255, 68, 85, 0.3); }
+}
+
+/* ── Animations ─────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-holo {
+  0%, 100% { box-shadow: 0 0 6px rgba(0, 180, 216, 0.3); }
+  50%       { box-shadow: 0 0 20px rgba(0, 180, 216, 0.7); }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% center; }
+  to   { background-position: 200% center; }
+}
+
+@keyframes scanlines {
+  0%   { background-position: 0 0; }
+  100% { background-position: 0 4px; }
+}
+
+.animate-fade-in-up { animation: fadeInUp 0.4s ease both; }
+.animate-pulse-holo { animation: pulse-holo 2s ease-in-out infinite; }
+
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--sand-300) 25%,
+    var(--gold) 50%,
+    var(--sand-300) 75%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 3s linear infinite;
+}
+
+/* Scanline overlay effect */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  pointer-events: none;
+  animation: scanlines 8s linear infinite;
+}
+
+/* ── Components ─────────────────────────────────────────────── */
+@layer components {
+  .btn-primary {
+    @apply px-6 py-2 rounded font-cinzel text-sm tracking-widest uppercase
+           bg-gradient-to-r from-sand-600 to-sand-500
+           text-sand-100 border border-sand-400
+           transition-all duration-200 cursor-pointer
+           hover:from-sand-500 hover:to-gold hover:glow-gold
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-holo {
+    @apply px-5 py-2 rounded font-cinzel text-sm tracking-wider uppercase
+           border border-holo text-holo bg-transparent
+           transition-all duration-200 cursor-pointer
+           hover:bg-holo/10 hover:glow-holo
+           disabled:opacity-30 disabled:cursor-not-allowed;
+  }
+
+  .btn-danger {
+    @apply px-5 py-2 rounded font-cinzel text-sm tracking-wider uppercase
+           border border-danger text-danger bg-transparent
+           transition-all duration-200 cursor-pointer
+           hover:bg-danger/10 hover:glow-danger
+           disabled:opacity-30 disabled:cursor-not-allowed;
+  }
+
+  .card {
+    @apply bg-panel rounded-lg border border-sand overflow-hidden
+           transition-all duration-300;
+  }
+
+  .card-holo {
+    @apply bg-panel rounded-lg border border-holo overflow-hidden
+           animate-pulse-holo;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs
+           font-rajdhani font-medium tracking-wide;
+  }
+
+  .badge-success { @apply badge bg-success/10 text-success border border-success/30; }
+  .badge-danger  { @apply badge bg-danger/10  text-danger  border border-danger/30;  }
+  .badge-warn    { @apply badge bg-warning/10 text-warn    border border-warning/30; }
+  .badge-holo    { @apply badge bg-holo/10    text-holo    border border-holo/30;    }
+  .badge-gold    { @apply badge bg-gold/10    text-gold    border border-gold/30;    }
+}

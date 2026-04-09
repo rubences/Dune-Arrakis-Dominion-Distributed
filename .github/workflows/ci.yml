@@ -1,0 +1,61 @@
+name: 🏜 Dune Arrakis Dominion — CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Backend: Build & Test ─────────────────────────────────────────────────────
+  backend:
+    name: Backend .NET 8
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c Release --nologo
+
+      - name: Test
+        run: dotnet test --no-build -c Release --nologo --logger "console;verbosity=minimal"
+
+      - name: Publish artifact
+        run: dotnet publish src/DuneArrakis.SimulationService/DuneArrakis.SimulationService.csproj -c Release -o ./publish --no-build
+        if: github.ref == 'refs/heads/main'
+
+  # ── Frontend: Build ────────────────────────────────────────────────────────────
+  frontend:
+    name: Frontend Next.js
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.RAILWAY_BACKEND_URL || 'http://localhost:5000' }}
