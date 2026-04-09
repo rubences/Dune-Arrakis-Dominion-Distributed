@@ -13,6 +13,8 @@ WAIT_REMOTE="false"
 SKIP_BOOTSTRAP="false"
 SKIP_GGA="false"
 SKIP_CREWAI="false"
+AUTO_STAGE_SIMULATION="false"
+GGA_ONLY="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -42,6 +44,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-crewai)
       SKIP_CREWAI="true"
+      shift
+      ;;
+    --auto-stage-simulation)
+      AUTO_STAGE_SIMULATION="true"
+      shift
+      ;;
+    --gga-only)
+      GGA_ONLY="true"
       shift
       ;;
     *)
@@ -92,10 +102,12 @@ if [[ ! -x "$TOOLS_BIN/engram" || ! -x "$TOOLS_BIN/gentle-ai" || ! -x "$TOOLS_BI
   log_error "Local tools not found in automation/tools/bin. Run bootstrap first."
 fi
 
-run_or_pending "Engram setup for $AGENT" "$TOOLS_BIN/engram" setup "$AGENT"
-run_or_pending "Gentle preset for $AGENT" "$TOOLS_BIN/gentle-ai" install --agent "$AGENT" --preset full-gentleman
+if [[ "$GGA_ONLY" != "true" ]]; then
+  run_or_pending "Engram setup for $AGENT" "$TOOLS_BIN/engram" setup "$AGENT"
+  run_or_pending "Gentle preset for $AGENT" "$TOOLS_BIN/gentle-ai" install --agent "$AGENT" --preset full-gentleman
+fi
 
-if [[ "$SKIP_CREWAI" != "true" ]]; then
+if [[ "$SKIP_CREWAI" != "true" && "$GGA_ONLY" != "true" ]]; then
   PYTHON_CMD=""
   if [[ -x "$REPO_ROOT/.venv/bin/python" ]]; then
     PYTHON_CMD="$REPO_ROOT/.venv/bin/python"
@@ -131,6 +143,11 @@ if [[ "$SKIP_CREWAI" != "true" ]]; then
 fi
 
 if [[ "$SKIP_GGA" != "true" ]]; then
+  if [[ "$AUTO_STAGE_SIMULATION" == "true" ]]; then
+    log_step "Auto-stage simulation and test files for GGA"
+    git -C "$REPO_ROOT" add -- "src/DuneArrakis.SimulationService" "tests/DuneArrakis.Tests"
+  fi
+
   log_step "Run GGA review for staged simulation changes"
 
   staged_simulation_count=$(git -C "$REPO_ROOT" diff --cached --name-only -- "src/DuneArrakis.SimulationService/**" "tests/DuneArrakis.Tests/**" | wc -l | tr -d ' ')

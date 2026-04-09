@@ -1,15 +1,14 @@
 RESUMEN
 - agent: opencode
 - crewai_mode: local
-- steps_executed: 3
+- steps_executed: 2
 
 PASOS
-- Sync + build local Gentleman tools
-- Engram setup for opencode
-- Gentle preset for opencode
+- Auto-stage simulation and test files for GGA
+- Run GGA review for staged simulation changes
 
 PENDIENTES
-- none
+- No staged simulation/test changes found for GGA. Stage files and rerun.
 
 ERRORES
 - none

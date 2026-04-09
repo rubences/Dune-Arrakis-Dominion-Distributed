@@ -44,7 +44,14 @@ bash automation/local/run-game-ai-stack.sh --crewai-mode remote --wait-remote
 
 # CrewAI con estado de juego custom
 bash automation/local/run-game-ai-stack.sh --state-file /ruta/game_state.json
+
+# Solo GGA y con stage automatico de archivos de simulacion/tests
+bash automation/local/run-game-ai-stack.sh --skip-bootstrap --skip-crewai --gga-only --auto-stage-simulation
 ```
+
+Task de VS Code recomendada para este flujo:
+
+- `Local: Auto-Stage Simulation + GGA Review`
 
 ## Usar herramientas en la shell actual
 
