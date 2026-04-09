@@ -1,6 +1,7 @@
 using DuneArrakis.Domain.Entities;
 using DuneArrakis.Domain.Enums;
 using DuneArrakis.SimulationService.Services;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -103,9 +104,13 @@ public class MonthlyDecisionAutomationServiceTests
             DefaultGameName = "Dune: Arrakis Dominion"
         });
 
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>())
+            .Build();
+
         return new MonthlyDecisionAutomationService(
             client,
-            new CrewAiWebhookStore(),
+            new CrewAiWebhookStore(configuration),
             options,
             new FakeSimulationEngine(),
             NullLogger<MonthlyDecisionAutomationService>.Instance);
