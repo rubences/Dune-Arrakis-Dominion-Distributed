@@ -11,6 +11,10 @@ Script principal:
 
 - `automation/windows/install-gentleman-stack.ps1`
 
+Script de sincronizacion de repos oficiales:
+
+- `automation/windows/sync-gentleman-repos.ps1`
+
 ## Ejecucion rapida (PowerShell)
 
 ```powershell
@@ -30,6 +34,12 @@ powershell -ExecutionPolicy Bypass -File .\automation\windows\install-gentleman-
 
 # Cambiar carpeta de fuentes para clonado
 powershell -ExecutionPolicy Bypass -File .\automation\windows\install-gentleman-stack.ps1 -SourceRoot "$env:USERPROFILE\src"
+
+# Sincronizar los 4 repos oficiales Gentleman
+powershell -ExecutionPolicy Bypass -File .\automation\windows\sync-gentleman-repos.ps1
+
+# Sincronizar y luego ejecutar instalador completo
+powershell -ExecutionPolicy Bypass -File .\automation\windows\sync-gentleman-repos.ps1 -RunInstaller
 ```
 
 ## Resultado esperado

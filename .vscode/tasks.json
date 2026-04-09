@@ -2,6 +2,27 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Windows: Sync Gentleman Repos",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\automation\\windows\\sync-gentleman-repos.ps1"
+      ],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          ".\\automation\\windows\\sync-gentleman-repos.ps1"
+        ]
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Windows: Install OpenCode + Gentleman Stack",
       "type": "shell",
       "command": "powershell",
