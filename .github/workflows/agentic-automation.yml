@@ -40,7 +40,7 @@ jobs:
           CREWAI_BEARER_TOKEN: ${{ secrets.CREWAI_BEARER_TOKEN }}
           CREWAI_USER_BEARER_TOKEN: ${{ secrets.CREWAI_USER_BEARER_TOKEN }}
         run: |
-          python automation/agentic_project_automation.py --skip-ai
+          python automation/agentic_project_automation.py --skip-ai --adaptive --auto-remediate
 
       - name: Run remote AI automation (optional)
         if: ${{ secrets.CREWAI_API_URL != '' && (secrets.CREWAI_BEARER_TOKEN != '' || secrets.CREWAI_USER_BEARER_TOKEN != '') }}
@@ -49,12 +49,58 @@ jobs:
           CREWAI_BEARER_TOKEN: ${{ secrets.CREWAI_BEARER_TOKEN }}
           CREWAI_USER_BEARER_TOKEN: ${{ secrets.CREWAI_USER_BEARER_TOKEN }}
         run: |
-          python automation/agentic_project_automation.py --skip-build --skip-tests --ai-mode remote --wait-remote
+          python automation/agentic_project_automation.py --skip-build --skip-tests --ai-mode remote --wait-remote --adaptive
+
+      - name: Publish automation summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report_file = Path("automation/output/agentic_automation_report.json")
+          lines = ["## Agentic Automation Summary", ""]
+
+          if not report_file.exists():
+              lines.append("- Reporte no disponible.")
+          else:
+              report = json.loads(report_file.read_text(encoding="utf-8"))
+              summary_status = report.get("summary_status", "unknown")
+              commands = report.get("commands", [])
+              failed = [command for command in commands if not command.get("success", False)]
+              remediation = report.get("remediation", {})
+              profile = report.get("execution_profile", {})
+
+              lines.append(f"- Estado: **{summary_status}**")
+              lines.append(f"- Comandos ejecutados: **{len(commands)}**")
+              lines.append(f"- Comandos fallidos: **{len(failed)}**")
+              lines.append(f"- Perfil adaptativo: **{profile.get('adaptive', False)}**")
+
+              if remediation:
+                  lines.append(f"- Remediacion intentada: **{remediation.get('attempted', False)}**")
+                  lines.append(
+                      f"- Tests fallidos iniciales/restantes: **{remediation.get('initial_failed_count', 0)} / {remediation.get('remaining_failed_count', 0)}**"
+                  )
+
+              if failed:
+                  lines.append("")
+                  lines.append("### Failed Commands")
+                  for command in failed:
+                      lines.append(f"- `{command.get('name', 'unknown')}` (exit={command.get('exit_code', '?')})")
+
+          summary_path = Path("automation/output/agentic-summary.md")
+          summary_path.parent.mkdir(parents=True, exist_ok=True)
+          summary_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+          cat automation/output/agentic-summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload automation report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: agentic-automation-report
-          path: automation/output/agentic_automation_report.json
+          path: |
+            automation/output/agentic_automation_report.json
+            automation/output/agentic_automation_history.json
+            automation/output/agentic-summary.md
           if-no-files-found: warn

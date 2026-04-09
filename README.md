@@ -95,6 +95,7 @@ Agentes incluidos en el pipeline:
 Salida del pipeline:
 
 - `automation/output/agentic_automation_report.json`: reporte JSON con pasos, comandos, errores y recomendaciones.
+- `automation/output/agentic_automation_history.json`: memoria de ejecuciones previas para ajustar el perfil adaptativo.
 - `automation/output/monthly_actions.json`: acciones mensuales si se ejecuta la fase AI.
 
 ### Ejecucion local recomendada
@@ -103,6 +104,12 @@ Validacion tecnica completa sin fase AI:
 
 ```bash
 python automation/agentic_project_automation.py --skip-ai
+```
+
+Modo adaptativo con memoria historica + remediacion automatica de tests:
+
+```bash
+python automation/agentic_project_automation.py --skip-ai --adaptive --auto-remediate
 ```
 
 Pipeline completo con AI local:
@@ -120,11 +127,56 @@ export CREWAI_USER_BEARER_TOKEN="..."
 python automation/agentic_project_automation.py --ai-mode remote --wait-remote
 ```
 
+Opciones nuevas relevantes:
+
+- `--adaptive`: usa historial de fallos para ajustar fases del pipeline.
+- `--auto-remediate`: si fallan tests, ejecuta rerun selectivo y guarda comparativa.
+- `--history-file`: ruta de memoria historica (por defecto `automation/output/agentic_automation_history.json`).
+- `--history-keep`: cantidad maxima de ejecuciones historicas almacenadas.
+- `--test-results-file`: ruta del `.trx` para analisis y remediacion.
+
 ### Automatizacion en GitHub Actions
 
 Se agrego el workflow `.github/workflows/agentic-automation.yml` que:
 
 - Corre en push/PR a `main`, programado semanalmente y por ejecucion manual.
-- Ejecuta el pipeline de calidad (`--skip-ai`) para garantizar estabilidad.
+- Ejecuta el pipeline de calidad (`--skip-ai --adaptive --auto-remediate`) para garantizar estabilidad y autocorreccion basica.
 - Ejecuta fase remota AI opcional si existen secretos `CREWAI_API_URL` y token.
-- Publica el reporte como artifact.
+- Publica un resumen Markdown en el `Job Summary` de GitHub Actions.
+- Publica artifacts: reporte, historial y resumen.
+
+## Instalador nativo Windows del stack Gentleman
+
+Se agrego el script [automation/windows/install-gentleman-stack.ps1](automation/windows/install-gentleman-stack.ps1) para instalar de forma idempotente y verificable en Windows 10/11:
+
+- OpenCode
+- Engram
+- gentle-ai
+- Gentleman Guardian Angel (GGA)
+
+El script implementa fases completas:
+
+- Auditoria inicial de sistema y herramientas.
+- Instalacion de dependencias (Git, Go, Scoop, Git Bash).
+- Instalacion con prioridades y fallbacks oficiales.
+- Integracion de Engram y gentle-ai con OpenCode.
+- Instalacion de GGA usando Git Bash.
+- Verificacion final y reporte con formato de operaciones.
+
+Ejecucion recomendada en PowerShell (Windows nativo):
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned -Force
+cd <ruta-del-repo>
+powershell -ExecutionPolicy Bypass -File .\automation\windows\install-gentleman-stack.ps1
+```
+
+Salida del reporte:
+
+- Se genera un reporte en `automation/output/windows-gentleman-stack-report-YYYYMMDD-HHMMSS.txt` con:
+  - resumen
+  - versiones
+  - rutas importantes
+  - cambios de PATH
+  - pendientes
+  - errores o riesgos
