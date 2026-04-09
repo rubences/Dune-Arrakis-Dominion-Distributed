@@ -3,6 +3,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using DuneArrakis.Domain.Entities;
 using DuneArrakis.Domain.Enums;
+using DuneArrakis.Domain.Exceptions;
+using DuneArrakis.SimulationService.Utils;
 using Microsoft.Extensions.Options;
 
 namespace DuneArrakis.SimulationService.Services;
@@ -315,26 +317,22 @@ public class MonthlyDecisionAutomationService : IMonthlyDecisionAutomationServic
             if (sourceEnclave is null || creature is null || !creature.IsAlive)
                 continue;
 
-            var targetEnclave = exhibitionEnclaves.FirstOrDefault(enclave => enclave.Creatures.Count(c => c.IsAlive) < enclave.MaxCreatureCapacity);
+            var targetEnclave = exhibitionEnclaves.FirstOrDefault(enclave => enclave.CanFitCreature());
             if (targetEnclave is null)
                 continue;
 
-            if (sourceEnclave.Type != EnclaveType.Aclimatacion || creature.Health <= 75 || creature.AgeInMonths < 12)
+            if (sourceEnclave.Type != EnclaveType.Aclimatacion || creature.AgeInMonths < 12)
                 continue;
 
-            sourceEnclave.Creatures.Remove(creature);
-            creature.EnclaveId = targetEnclave.Id;
-            targetEnclave.Creatures.Add(creature);
-            result.ExecutedTransfers.Add(creature.Id);
-
-            scenario.EventLog.Add(new SimulationEvent
+            try
             {
-                Month = scenario.CurrentMonth,
-                EventType = "TrasladoAutomatico",
-                Description = $"{creature.Name} trasladado automáticamente a {targetEnclave.Name} por el crew de decisiones.",
-                CreatureId = creature.Id,
-                EnclaveId = targetEnclave.Id
-            });
+                scenario.TransferCreature(sourceEnclave.Id, targetEnclave.Id, creature.Id);
+                result.ExecutedTransfers.Add(creature.Id);
+            }
+            catch (DomainException)
+            {
+                // Se ignora si las reglas de dominio rechazan el traslado
+            }
         }
     }
 
@@ -373,7 +371,7 @@ public class MonthlyDecisionAutomationService : IMonthlyDecisionAutomationServic
         if (string.IsNullOrWhiteSpace(rawText))
             return new MonthlyAutomationActions();
 
-        var normalized = ExtractJson(rawText);
+        var normalized = JsonExtractor.Extract(rawText);
         if (normalized is null)
         {
             _logger.LogWarning("No se pudo extraer JSON de acciones del crew de decisiones. Se devuelve salida vacía.");
@@ -390,28 +388,6 @@ public class MonthlyDecisionAutomationService : IMonthlyDecisionAutomationServic
             _logger.LogWarning(ex, "El JSON devuelto por el crew de decisiones no es válido. Se conserva la salida cruda.");
             return new MonthlyAutomationActions { RawOutput = rawText };
         }
-    }
-
-    private static string? ExtractJson(string rawText)
-    {
-        var trimmed = rawText.Trim();
-        if (trimmed.StartsWith("```", StringComparison.Ordinal))
-        {
-            var firstBrace = trimmed.IndexOf('{');
-            var lastBrace = trimmed.LastIndexOf('}');
-            if (firstBrace >= 0 && lastBrace > firstBrace)
-                return trimmed[firstBrace..(lastBrace + 1)];
-        }
-
-        if (trimmed.StartsWith('{') && trimmed.EndsWith('}'))
-            return trimmed;
-
-        var start = trimmed.IndexOf('{');
-        var end = trimmed.LastIndexOf('}');
-        if (start >= 0 && end > start)
-            return trimmed[start..(end + 1)];
-
-        return null;
     }
 }
 

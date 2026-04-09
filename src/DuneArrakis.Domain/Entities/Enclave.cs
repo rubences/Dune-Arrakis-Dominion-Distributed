@@ -35,4 +35,22 @@ public class Enclave
         NivelAdquisitivo = 8,
         MaxCreatureCapacity = 20
     };
+    public bool CanFitCreature()
+    {
+        return Creatures.Count(c => c.IsAlive) < MaxCreatureCapacity;
+    }
+
+    public void AddCreature(Creature creature)
+    {
+        if (!CanFitCreature())
+            throw new Exceptions.InvalidEntityStateException($"El enclave '{Name}' está lleno.");
+        
+        creature.EnclaveId = Id;
+        Creatures.Add(creature);
+    }
+
+    public void RemoveCreature(Creature creature)
+    {
+        Creatures.Remove(creature);
+    }
 }

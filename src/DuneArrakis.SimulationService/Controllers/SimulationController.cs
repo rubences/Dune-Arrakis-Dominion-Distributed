@@ -57,36 +57,16 @@ public class SimulationController : ControllerBase
         if (request is null || request.GameState is null)
             return BadRequest("La solicitud no puede ser nula.");
 
-        var scenario = request.GameState.ActiveScenario;
-        var enclave = scenario.Enclaves.FirstOrDefault(e => e.Id == request.EnclaveId);
-        if (enclave is null)
-            return NotFound($"No se encontró el enclave '{request.EnclaveId}'.");
-
-        if (!Creature.Templates.TryGetValue(request.CreatureType, out var template))
-            return BadRequest($"Tipo de criatura no válido: {request.CreatureType}.");
-
-        if (scenario.CurrentSolaris < template.AcquisitionCost)
-            return BadRequest($"Saldo insuficiente. Necesita {template.AcquisitionCost:N0} Solaris pero solo tiene {scenario.CurrentSolaris:N0}.");
-
-        if (enclave.Creatures.Count(c => c.IsAlive) >= enclave.MaxCreatureCapacity)
-            return BadRequest($"El enclave '{enclave.Name}' está lleno (capacidad máxima: {enclave.MaxCreatureCapacity}).");
-
-        var creature = Creature.Create(request.CreatureType);
-        creature.EnclaveId = enclave.Id;
-        enclave.Creatures.Add(creature);
-        scenario.CurrentSolaris -= template.AcquisitionCost;
-
-        scenario.EventLog.Add(new SimulationEvent
+        try
         {
-            Month = scenario.CurrentMonth,
-            EventType = "Compra",
-            Description = $"Adquirido {creature.Name} para {enclave.Name}. Coste: {template.AcquisitionCost:N0} Solaris.",
-            SolarisChange = -template.AcquisitionCost,
-            CreatureId = creature.Id,
-            EnclaveId = enclave.Id
-        });
-
-        return Ok(request.GameState);
+            var scenario = request.GameState.ActiveScenario;
+            scenario.PurchaseCreature(request.EnclaveId, request.CreatureType);
+            return Ok(request.GameState);
+        }
+        catch (DuneArrakis.Domain.Exceptions.DomainException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPost("transfer-creature")]
@@ -95,42 +75,16 @@ public class SimulationController : ControllerBase
         if (request is null || request.GameState is null)
             return BadRequest("La solicitud no puede ser nula.");
 
-        var scenario = request.GameState.ActiveScenario;
-        var sourceEnclave = scenario.Enclaves.FirstOrDefault(e => e.Id == request.SourceEnclaveId);
-        var targetEnclave = scenario.Enclaves.FirstOrDefault(e => e.Id == request.TargetEnclaveId);
-
-        if (sourceEnclave is null)
-            return NotFound($"No se encontró el enclave origen '{request.SourceEnclaveId}'.");
-        if (targetEnclave is null)
-            return NotFound($"No se encontró el enclave destino '{request.TargetEnclaveId}'.");
-
-        var creature = sourceEnclave.Creatures.FirstOrDefault(c => c.Id == request.CreatureId);
-        if (creature is null)
-            return NotFound($"No se encontró la criatura '{request.CreatureId}'.");
-
-        if (!creature.IsAlive)
-            return BadRequest("No se puede trasladar una criatura que no está viva.");
-
-        if (creature.Health < 75)
-            return BadRequest($"No se puede trasladar '{creature.Name}'. La criatura necesita al menos 75 de salud (actual: {creature.Health}).");
-
-        if (targetEnclave.Creatures.Count(c => c.IsAlive) >= targetEnclave.MaxCreatureCapacity)
-            return BadRequest($"El enclave destino '{targetEnclave.Name}' está lleno.");
-
-        sourceEnclave.Creatures.Remove(creature);
-        creature.EnclaveId = targetEnclave.Id;
-        targetEnclave.Creatures.Add(creature);
-
-        scenario.EventLog.Add(new SimulationEvent
+        try
         {
-            Month = scenario.CurrentMonth,
-            EventType = "Traslado",
-            Description = $"{creature.Name} trasladado de '{sourceEnclave.Name}' a '{targetEnclave.Name}'.",
-            CreatureId = creature.Id,
-            EnclaveId = targetEnclave.Id
-        });
-
-        return Ok(request.GameState);
+            var scenario = request.GameState.ActiveScenario;
+            scenario.TransferCreature(request.SourceEnclaveId, request.TargetEnclaveId, request.CreatureId);
+            return Ok(request.GameState);
+        }
+        catch (DuneArrakis.Domain.Exceptions.DomainException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPost("build-facility")]
@@ -139,32 +93,16 @@ public class SimulationController : ControllerBase
         if (request is null || request.GameState is null)
             return BadRequest("La solicitud no puede ser nula.");
 
-        var scenario = request.GameState.ActiveScenario;
-        var enclave = scenario.Enclaves.FirstOrDefault(e => e.Id == request.EnclaveId);
-        if (enclave is null)
-            return NotFound($"No se encontró el enclave '{request.EnclaveId}'.");
-
-        if (!Facility.Catalog.TryGetValue(request.FacilityType, out var catalogEntry))
-            return BadRequest($"Tipo de instalación no válido: {request.FacilityType}.");
-
-        var (name, cost, _) = catalogEntry;
-        if (scenario.CurrentSolaris < cost)
-            return BadRequest($"Saldo insuficiente. Necesita {cost:N0} Solaris pero solo tiene {scenario.CurrentSolaris:N0}.");
-
-        var facility = Facility.Create(request.FacilityType);
-        enclave.Facilities.Add(facility);
-        scenario.CurrentSolaris -= cost;
-
-        scenario.EventLog.Add(new SimulationEvent
+        try
         {
-            Month = scenario.CurrentMonth,
-            EventType = "Construccion",
-            Description = $"Construida instalación '{name}' en {enclave.Name}. Coste: {cost:N0} Solaris.",
-            SolarisChange = -cost,
-            EnclaveId = enclave.Id
-        });
-
-        return Ok(request.GameState);
+            var scenario = request.GameState.ActiveScenario;
+            scenario.BuildFacility(request.EnclaveId, request.FacilityType);
+            return Ok(request.GameState);
+        }
+        catch (DuneArrakis.Domain.Exceptions.DomainException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPost("feed-creature")]
@@ -173,31 +111,16 @@ public class SimulationController : ControllerBase
         if (request is null || request.GameState is null)
             return BadRequest("La solicitud no puede ser nula.");
 
-        var scenario = request.GameState.ActiveScenario;
-        var enclave = scenario.Enclaves
-            .FirstOrDefault(e => e.Creatures.Any(c => c.Id == request.CreatureId));
-
-        if (enclave is null)
-            return NotFound("No se encontró la criatura en ningún enclave.");
-
-        var creature = enclave.Creatures.FirstOrDefault(c => c.Id == request.CreatureId);
-        if (creature is null)
-            return NotFound($"Criatura '{request.CreatureId}' no encontrada.");
-
-        if (!creature.IsAlive)
-            return BadRequest("No se puede alimentar una criatura que no está viva.");
-
-        var foodCost = creature.MonthlyFoodCost * (decimal)request.FoodAmount / creature.FoodRequiredPerMonth;
-        if (scenario.CurrentSolaris < foodCost)
-            return BadRequest($"Saldo insuficiente para alimentar a {creature.Name}.");
-
-        creature.FoodConsumedThisMonth = Math.Min(
-            creature.FoodConsumedThisMonth + request.FoodAmount,
-            creature.FoodRequiredPerMonth);
-
-        scenario.CurrentSolaris -= foodCost;
-
-        return Ok(request.GameState);
+        try
+        {
+            var scenario = request.GameState.ActiveScenario;
+            scenario.FeedCreature(request.CreatureId, request.FoodAmount);
+            return Ok(request.GameState);
+        }
+        catch (DuneArrakis.Domain.Exceptions.DomainException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpGet("health")]

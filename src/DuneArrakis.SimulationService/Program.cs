@@ -17,34 +17,33 @@ builder.Services.AddOptions<CrewAiOptions>()
 builder.Services.AddOptions<DecisionCrewAiOptions>()
     .Bind(builder.Configuration.GetSection(DecisionCrewAiOptions.SectionName));
 
+static void ConfigureCrewAiHttpClient(HttpClient client, string baseUrl, int timeout, string token)
+{
+    if (Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri))
+        client.BaseAddress = baseUri;
+
+    client.Timeout = TimeSpan.FromSeconds(Math.Max(5, timeout));
+
+    if (!string.IsNullOrWhiteSpace(token))
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+}
+
 builder.Services.AddHttpClient<ICrewAiClient, CrewAiClient>((serviceProvider, client) =>
 {
     var options = serviceProvider.GetRequiredService<IOptions<CrewAiOptions>>().Value;
-
-    if (Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var baseUri))
-        client.BaseAddress = baseUri;
-
-    client.Timeout = TimeSpan.FromSeconds(Math.Max(5, options.RequestTimeoutSeconds));
-
-    if (!string.IsNullOrWhiteSpace(options.BearerToken))
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.BearerToken);
+    ConfigureCrewAiHttpClient(client, options.BaseUrl, options.RequestTimeoutSeconds, options.BearerToken);
 });
 
 builder.Services.AddSingleton<ISimulationEngine, SimulationEngine>();
 builder.Services.AddSingleton<ICrewAiAdvisor, CrewAiAdvisor>();
 builder.Services.AddSingleton<ICrewAiWebhookStore, CrewAiWebhookStore>();
+
 builder.Services.AddHttpClient<IDecisionCrewAiClient, DecisionCrewAiClient>((serviceProvider, client) =>
 {
     var options = serviceProvider.GetRequiredService<IOptions<DecisionCrewAiOptions>>().Value;
-
-    if (Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var baseUri))
-        client.BaseAddress = baseUri;
-
-    client.Timeout = TimeSpan.FromSeconds(Math.Max(5, options.RequestTimeoutSeconds));
-
-    if (!string.IsNullOrWhiteSpace(options.BearerToken))
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.BearerToken);
+    ConfigureCrewAiHttpClient(client, options.BaseUrl, options.RequestTimeoutSeconds, options.BearerToken);
 });
+
 builder.Services.AddSingleton<IMonthlyDecisionAutomationService, MonthlyDecisionAutomationService>();
 
 var app = builder.Build();

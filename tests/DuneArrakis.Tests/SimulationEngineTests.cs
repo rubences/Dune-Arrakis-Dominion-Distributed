@@ -251,5 +251,18 @@ public class SimulationEngineTests
             Assert.True(cost > 0);
             Assert.True(maintenance > 0);
         }
+    [Fact]
+    public void PurchaseCreature_WithInsufficientFunds_ThrowsDomainException()
+    {
+        var scenario = Scenario.CreateArrakeen();
+        var enclave = Enclave.CreateExhibicion("Test");
+        scenario.Enclaves.Add(enclave);
+        // Vaciar fondos
+        scenario.CurrentSolaris = 0; 
+
+        Assert.Throws<DuneArrakis.Domain.Exceptions.InsufficientFundsException>(() =>
+        {
+            scenario.PurchaseCreature(enclave.Id, CreatureType.GusanoDeArenaJuvenil);
+        });
     }
 }
