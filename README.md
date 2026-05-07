@@ -230,3 +230,19 @@ Esto deja disponibles, dentro del propio proyecto:
 - `automation/tools/bin/gga`
 - `automation/tools/skills/curated`
 - `automation/tools/skills/community`
+
+
+## Despliegue facil de todo el motor (Web + CrewAI + Unity)
+
+Se agrego una guia de despliegue unificado en `deployment/DEPLOYMENT_GUIDE.md` y un comando unico para levantar el stack local completo:
+
+```bash
+bash deployment/deploy-full-stack.sh up
+```
+
+Incluye:
+- Frontend (Next.js)
+- SimulationService (.NET)
+- PersistenceService (.NET)
+- Variables de integracion con CrewAI
+- Ruta de conexion para Unity hacia el backend autoritario
