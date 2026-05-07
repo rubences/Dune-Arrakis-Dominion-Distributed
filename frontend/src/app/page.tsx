@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { GameState, SimulationResult, SimulationEvent, Enclave, CREATURE_CATALOG, EVENT_ICONS, SCENARIO_NAMES } from '@/lib/types';
 import * as api from '@/lib/api';
 
@@ -22,7 +23,7 @@ function AgentCard({ name, icon, state }: { name: string; icon: string; state: A
   };
 
   return (
-    <div className={`card p-4 transition-all duration-500 ${colors[state.status]}`}>
+    <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`card p-4 transition-all duration-500 ${colors[state.status]}`}>
       <div className="flex items-center gap-3 mb-2">
         <span className="text-2xl">{icon}</span>
         <div>
@@ -33,7 +34,7 @@ function AgentCard({ name, icon, state }: { name: string; icon: string; state: A
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -58,11 +59,16 @@ function SolarisCounter({ value }: { value: number }) {
 function EventFeed({ events }: { events: SimulationEvent[] }) {
   return (
     <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+      <AnimatePresence mode="popLayout">
       {events.length === 0 && (
         <p className="text-sand-500 text-sm italic text-center py-4">Sin eventos aún. Procesa el primer mes.</p>
       )}
       {[...events].reverse().slice(0, 30).map((ev, i) => (
-        <div
+        <motion.div
+          layout
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
           key={i}
           className="flex items-start gap-2 text-sm animate-fade-in-up bg-sand-900/50 rounded px-3 py-2"
           style={{ animationDelay: `${i * 30}ms` }}
@@ -74,8 +80,9 @@ function EventFeed({ events }: { events: SimulationEvent[] }) {
               {ev.solarisChange > 0 ? '+' : ''}{ev.solarisChange.toLocaleString('es-ES')} ◈
             </span>
           )}
-        </div>
+        </motion.div>
       ))}
+      </AnimatePresence>
     </div>
   );
 }
