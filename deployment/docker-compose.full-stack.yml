@@ -1,0 +1,48 @@
+version: '3.9'
+
+services:
+  simulation-service:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    container_name: dune-simulation-service
+    working_dir: /app
+    volumes:
+      - ../:/app
+    command: bash -lc "dotnet restore DuneArrakisDominion.slnx && dotnet run --project src/DuneArrakis.SimulationService/DuneArrakis.SimulationService.csproj --urls=http://0.0.0.0:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      CrewAi__BaseUrl: ${CREWAI_BASE_URL:-}
+      CrewAi__BearerToken: ${CREWAI_BEARER_TOKEN:-}
+      DecisionCrewAi__BaseUrl: ${DECISION_CREWAI_BASE_URL:-}
+      DecisionCrewAi__BearerToken: ${DECISION_CREWAI_BEARER_TOKEN:-}
+    ports:
+      - "8080:8080"
+
+  persistence-service:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    container_name: dune-persistence-service
+    working_dir: /app
+    volumes:
+      - ../:/app
+    command: bash -lc "dotnet restore DuneArrakisDominion.slnx && dotnet run --project src/DuneArrakis.PersistenceService/DuneArrakis.PersistenceService.csproj --urls=http://0.0.0.0:8081"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:8081
+    ports:
+      - "8081:8081"
+
+  frontend:
+    image: node:20
+    container_name: dune-frontend
+    working_dir: /app/frontend
+    volumes:
+      - ../:/app
+    command: bash -lc "npm ci && npm run dev -- --hostname 0.0.0.0 --port 3000"
+    environment:
+      NEXT_PUBLIC_SIMULATION_API_URL: http://localhost:8080
+      NEXT_PUBLIC_PERSISTENCE_API_URL: http://localhost:8081
+    ports:
+      - "3000:3000"
+    depends_on:
+      - simulation-service
+      - persistence-service
