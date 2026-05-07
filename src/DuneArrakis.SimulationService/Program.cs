@@ -69,6 +69,9 @@ builder.Services.AddOptions<CrewAiOptions>()
 builder.Services.AddOptions<DecisionCrewAiOptions>()
     .Bind(builder.Configuration.GetSection(DecisionCrewAiOptions.SectionName));
 
+builder.Services.AddOptions<SecurityOptions>()
+    .Bind(builder.Configuration.GetSection(SecurityOptions.SectionName));
+
 // ──────────────────────────────────────────────────────────────────────────────
 // HTTP Clients para CrewAI (helper local)
 // ──────────────────────────────────────────────────────────────────────────────
@@ -104,6 +107,7 @@ builder.Services.AddScoped<ISimulationEngine, SimulationEngine>();
 builder.Services.AddSingleton<ICrewAiAdvisor, CrewAiAdvisor>();
 builder.Services.AddSingleton<ICrewAiWebhookStore, CrewAiWebhookStore>();
 builder.Services.AddSingleton<IMonthlyDecisionAutomationService, MonthlyDecisionAutomationService>();
+builder.Services.AddSingleton<IWebhookSignatureVerifier, WebhookSignatureVerifier>();
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Build & Middleware Pipeline

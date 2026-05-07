@@ -1,0 +1,25 @@
+name: Full Stack Smoke Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "deployment/**"
+      - "frontend/**"
+      - "src/**"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate docker compose
+        run: docker compose -f deployment/docker-compose.full-stack.yml config
+
+      - name: Report
+        run: |
+          echo "Stack definition OK" >> $GITHUB_STEP_SUMMARY
+          echo "Configure Vercel + CrewAI secrets manually for real deploy." >> $GITHUB_STEP_SUMMARY
