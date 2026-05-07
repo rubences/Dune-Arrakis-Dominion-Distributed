@@ -6,6 +6,7 @@ PERSIST_URL="${PERSIST_URL:-http://localhost:5100}"
 SAVE_NAME="${SAVE_NAME:-poc-e2e-$(date +%s)}"
 AUTO_START="${AUTO_START:-true}"
 WAIT_SECONDS="${WAIT_SECONDS:-60}"
+ALLOW_MOCK="${ALLOW_MOCK:-true}"
 
 log(){ echo "[$(date +%H:%M:%S)] $*"; }
 require(){ command -v "$1" >/dev/null 2>&1 || { echo "Missing dependency: $1"; exit 1; }; }
@@ -40,6 +41,9 @@ start_services_if_needed() {
     log "Servicios no detectados. Intentando levantar servicios con dotnet..."
     dotnet run --project src/DuneArrakis.PersistenceService/DuneArrakis.PersistenceService.csproj --urls=http://0.0.0.0:5100 >/tmp/persistence.log 2>&1 &
     dotnet run --project src/DuneArrakis.SimulationService/DuneArrakis.SimulationService.csproj --urls=http://0.0.0.0:5200 >/tmp/simulation.log 2>&1 &
+  elif [[ "$ALLOW_MOCK" == "true" ]]; then
+    log "No hay docker/dotnet. Levantando mock services para validar checklist E2E..."
+    python3 deployment/mock_services.py >/tmp/mock_services.log 2>&1 &
   else
     echo "No hay docker ni dotnet disponibles para autostart."
     return 1
