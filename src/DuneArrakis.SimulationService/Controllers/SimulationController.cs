@@ -3,6 +3,7 @@ using DuneArrakis.Domain.Enums;
 using DuneArrakis.SimulationService.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 
 namespace DuneArrakis.SimulationService.Controllers;
 
@@ -17,6 +18,8 @@ public class SimulationController : ControllerBase
     private readonly IMonthlyDecisionAutomationService _monthlyDecisionAutomationService;
     private readonly ICrewAiWebhookStore _webhookStore;
     private readonly ILogger<SimulationController> _logger;
+    private readonly SecurityOptions _securityOptions;
+    private readonly IWebhookSignatureVerifier _signatureVerifier;
 
     public SimulationController(
         ISimulationEngine simulationEngine,
@@ -24,7 +27,9 @@ public class SimulationController : ControllerBase
         ICrewAiClient crewAiClient,
         IMonthlyDecisionAutomationService monthlyDecisionAutomationService,
         ICrewAiWebhookStore webhookStore,
-        ILogger<SimulationController> logger)
+        ILogger<SimulationController> logger,
+        IOptions<SecurityOptions> securityOptions,
+        IWebhookSignatureVerifier signatureVerifier)
     {
         _simulationEngine = simulationEngine;
         _crewAiAdvisor = crewAiAdvisor;
@@ -32,6 +37,8 @@ public class SimulationController : ControllerBase
         _monthlyDecisionAutomationService = monthlyDecisionAutomationService;
         _webhookStore = webhookStore;
         _logger = logger;
+        _securityOptions = securityOptions.Value;
+        _signatureVerifier = signatureVerifier;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -42,6 +49,9 @@ public class SimulationController : ControllerBase
     [HttpPost("new-game")]
     public ActionResult<GameState> NewGame([FromQuery] int scenarioType = 0, [FromQuery] string saveName = "Partida")
     {
+        var auth = EnsureApiKey();
+        if (auth is not null) return auth;
+
         var scenario = scenarioType switch
         {
             1 => Scenario.CreateGiediPrime(),
@@ -68,6 +78,9 @@ public class SimulationController : ControllerBase
         [FromBody] GameState gameState,
         CancellationToken cancellationToken)
     {
+        var auth = EnsureApiKey();
+        if (auth is not null) return auth;
+
         if (gameState?.ActiveScenario is null)
             return BadRequest("El estado del juego no puede ser nulo.");
 
@@ -87,6 +100,9 @@ public class SimulationController : ControllerBase
     [HttpPost("purchase-creature")]
     public ActionResult<GameState> PurchaseCreature([FromBody] PurchaseCreatureRequest request)
     {
+        var auth = EnsureApiKey();
+        if (auth is not null) return auth;
+
         if (request?.GameState?.ActiveScenario is null)
             return BadRequest("La solicitud no puede ser nula.");
 
@@ -110,6 +126,9 @@ public class SimulationController : ControllerBase
     [HttpPost("transfer-creature")]
     public ActionResult<GameState> TransferCreature([FromBody] TransferCreatureRequest request)
     {
+        var auth = EnsureApiKey();
+        if (auth is not null) return auth;
+
         if (request?.GameState?.ActiveScenario is null)
             return BadRequest("La solicitud no puede ser nula.");
 
@@ -129,6 +148,9 @@ public class SimulationController : ControllerBase
     [HttpPost("build-facility")]
     public ActionResult<GameState> BuildFacility([FromBody] BuildFacilityRequest request)
     {
+        var auth = EnsureApiKey();
+        if (auth is not null) return auth;
+
         if (request?.GameState?.ActiveScenario is null)
             return BadRequest("La solicitud no puede ser nula.");
 
@@ -147,6 +169,9 @@ public class SimulationController : ControllerBase
     [HttpPost("feed-creature")]
     public ActionResult<GameState> FeedCreature([FromBody] FeedCreatureRequest request)
     {
+        var auth = EnsureApiKey();
+        if (auth is not null) return auth;
+
         if (request?.GameState?.ActiveScenario is null)
             return BadRequest("La solicitud no puede ser nula.");
 
@@ -220,6 +245,9 @@ public class SimulationController : ControllerBase
         [FromBody] CrewAiKickoffApiRequest request,
         CancellationToken cancellationToken)
     {
+        var auth = EnsureApiKey();
+        if (auth is not null) return auth;
+
         if (!_crewAiClient.IsConfigured)
             return BadRequest("La integración con CrewAI no está configurada.");
         if (request?.Inputs.Count == 0)
@@ -259,6 +287,9 @@ public class SimulationController : ControllerBase
         [FromBody] CrewAiStrategicAdviceRequest request,
         CancellationToken cancellationToken)
     {
+        var auth = EnsureApiKey();
+        if (auth is not null) return auth;
+
         if (request?.GameState is null)
             return BadRequest("Debe proporcionar un estado del juego válido.");
         if (string.IsNullOrWhiteSpace(request.Prompt))
@@ -284,6 +315,9 @@ public class SimulationController : ControllerBase
         [FromBody] MonthlyAutomationRequest request,
         CancellationToken cancellationToken)
     {
+        var auth = EnsureApiKey();
+        if (auth is not null) return auth;
+
         if (request?.GameState is null)
             return BadRequest("Debe proporcionar un estado del juego válido.");
         try
@@ -305,9 +339,26 @@ public class SimulationController : ControllerBase
     [HttpPost("ai/webhooks/{source}")]
     public IActionResult ReceiveCrewAiWebhook(string source, [FromBody] JsonElement payload)
     {
+        var raw = payload.GetRawText();
+        var signature = Request.Headers["X-Signature"].FirstOrDefault();
+        if (!_signatureVerifier.IsValid(raw, signature))
+            return Unauthorized("Firma de webhook inválida.");
+
         _webhookStore.Store(source, payload);
         _logger.LogInformation("Webhook de CrewAI recibido para source {Source}.", source);
         return Accepted();
+    }
+
+    private ActionResult? EnsureApiKey()
+    {
+        if (string.IsNullOrWhiteSpace(_securityOptions.ApiKey))
+            return null;
+
+        var incoming = Request.Headers["X-API-Key"].FirstOrDefault();
+        if (incoming == _securityOptions.ApiKey)
+            return null;
+
+        return Unauthorized("API key inválida o ausente.");
     }
 }
 
